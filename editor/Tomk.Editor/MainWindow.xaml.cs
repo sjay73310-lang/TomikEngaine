@@ -114,7 +114,7 @@ class PlayerController : Component {
             _ => "DefaultMaterial"
         };
 
-        _sceneObjects.Add(new SceneObject
+        var sceneObject = new SceneObject
         {
             Name = name,
             Type = type,
@@ -125,7 +125,10 @@ class PlayerController : Component {
             ScaleY = sy,
             ScaleZ = sz,
             MaterialName = materialName
-        });
+        };
+
+        sceneObject.SetDefaultComponents();
+        _sceneObjects.Add(sceneObject);
     }
 
     private void RebuildViewports()
@@ -152,12 +155,16 @@ class PlayerController : Component {
         if (_showGizmo && HierarchyList.SelectedItem is SceneObject selected)
         {
             SceneViewport.Children.Add(new ModelVisual3D { Content = BuildGizmo(selected, _activeTool) });
+            if (selected.Type == SceneObjectType.Camera && selected.ShowCameraFrustum)
+            {
+                SceneViewport.Children.Add(new ModelVisual3D { Content = BuildCameraFrustum(selected) });
+            }
         }
     }
 
     private PerspectiveCamera BuildGameCamera()
     {
-        var cameraObject = _sceneObjects.FirstOrDefault(item => item.Type == SceneObjectType.Camera);
+        var cameraObject = _sceneObjects.FirstOrDefault(item => item.Type == SceneObjectType.Camera && item.CameraEnabled);
         if (cameraObject is null)
         {
             return new PerspectiveCamera
@@ -172,10 +179,37 @@ class PlayerController : Component {
         return new PerspectiveCamera
         {
             Position = new Point3D(cameraObject.X, cameraObject.Y, cameraObject.Z),
-            LookDirection = new Vector3D(0, -0.15, 1),
-            UpDirection = new Vector3D(0, 1, 0),
-            FieldOfView = 62
+            LookDirection = CameraForward(cameraObject),
+            UpDirection = CameraUp(cameraObject),
+            FieldOfView = Math.Clamp(cameraObject.CameraFov, 20, 140),
+            NearPlaneDistance = Math.Max(0.01, cameraObject.NearClip),
+            FarPlaneDistance = Math.Max(cameraObject.NearClip + 0.1, cameraObject.FarClip)
         };
+    }
+
+    private static Vector3D CameraForward(SceneObject cameraObject)
+    {
+        var transform = CameraRotationTransform(cameraObject);
+        var forward = transform.Transform(new Vector3D(0, 0, 1));
+        forward.Normalize();
+        return forward;
+    }
+
+    private static Vector3D CameraUp(SceneObject cameraObject)
+    {
+        var transform = CameraRotationTransform(cameraObject);
+        var up = transform.Transform(new Vector3D(0, 1, 0));
+        up.Normalize();
+        return up;
+    }
+
+    private static Transform3D CameraRotationTransform(SceneObject cameraObject)
+    {
+        var transform = new Transform3DGroup();
+        transform.Children.Add(new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(1, 0, 0), cameraObject.RotationX)));
+        transform.Children.Add(new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), cameraObject.RotationY)));
+        transform.Children.Add(new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 0, 1), cameraObject.RotationZ)));
+        return transform;
     }
 
     private void AddLights(Viewport3D viewport)
@@ -434,6 +468,52 @@ class PlayerController : Component {
         };
     }
 
+    private static GeometryModel3D BuildCameraFrustum(SceneObject cameraObject)
+    {
+        var visualFar = Math.Clamp(cameraObject.FarClip * 0.08, 1.8, 7.5);
+        var visualNear = Math.Clamp(cameraObject.NearClip * 0.8, 0.12, 0.45);
+        var fovRadians = Math.Clamp(cameraObject.CameraFov, 20, 140) * Math.PI / 180;
+        var aspect = Math.Clamp(cameraObject.AspectRatio, 0.4, 3.2);
+        var farHeight = Math.Tan(fovRadians / 2) * visualFar;
+        var farWidth = farHeight * aspect;
+        var nearHeight = Math.Tan(fovRadians / 2) * visualNear;
+        var nearWidth = nearHeight * aspect;
+
+        var mesh = new MeshGeometry3D
+        {
+            Positions = new Point3DCollection
+            {
+                new(0, 0, 0),
+                new(-nearWidth, -nearHeight, visualNear),
+                new(nearWidth, -nearHeight, visualNear),
+                new(nearWidth, nearHeight, visualNear),
+                new(-nearWidth, nearHeight, visualNear),
+                new(-farWidth, -farHeight, visualFar),
+                new(farWidth, -farHeight, visualFar),
+                new(farWidth, farHeight, visualFar),
+                new(-farWidth, farHeight, visualFar)
+            },
+            TriangleIndices = new Int32Collection
+            {
+                0, 5, 6, 0, 6, 7, 0, 7, 8, 0, 8, 5,
+                5, 7, 6, 5, 8, 7,
+                1, 2, 3, 1, 3, 4
+            }
+        };
+
+        var brush = new SolidColorBrush(Color.FromArgb(80, 242, 201, 76));
+        var material = new DiffuseMaterial(brush);
+        var transform = new Transform3DGroup();
+        transform.Children.Add(CameraRotationTransform(cameraObject));
+        transform.Children.Add(new TranslateTransform3D(cameraObject.X, cameraObject.Y, cameraObject.Z));
+
+        return new GeometryModel3D(mesh, material)
+        {
+            BackMaterial = material,
+            Transform = transform
+        };
+    }
+
     private void UpdateCameras()
     {
         var yaw = _cameraYaw * Math.PI / 180;
@@ -470,6 +550,7 @@ class PlayerController : Component {
             ScaleYBox.Text = "";
             ScaleZBox.Text = "";
             ComponentListBox.Items.Clear();
+            SetCameraInspectorEnabled(false);
         }
         else
         {
@@ -488,6 +569,13 @@ class PlayerController : Component {
             MaterialShaderBox.SelectedItem = FindShader(FindMaterial(sceneObject.MaterialName).ShaderName);
             ComponentNotesBox.Text = ComponentSummary(sceneObject);
             MeshRendererEnabledBox.IsChecked = sceneObject.MeshRendererEnabled;
+            CameraEnabledBox.IsChecked = sceneObject.CameraEnabled;
+            CameraFrustumBox.IsChecked = sceneObject.ShowCameraFrustum;
+            CameraFovBox.Text = Format(sceneObject.CameraFov);
+            CameraNearBox.Text = Format(sceneObject.NearClip);
+            CameraFarBox.Text = Format(sceneObject.FarClip);
+            CameraAspectBox.Text = Format(sceneObject.AspectRatio);
+            SetCameraInspectorEnabled(sceneObject.Type == SceneObjectType.Camera);
             RefreshComponentList(sceneObject);
             RefreshScriptDropdown();
         }
@@ -530,6 +618,15 @@ class PlayerController : Component {
             selected.MaterialName = materialAsset.Name;
         }
         selected.MeshRendererEnabled = MeshRendererEnabledBox.IsChecked == true;
+        if (selected.Type == SceneObjectType.Camera)
+        {
+            selected.CameraEnabled = CameraEnabledBox.IsChecked == true;
+            selected.ShowCameraFrustum = CameraFrustumBox.IsChecked == true;
+            selected.CameraFov = Math.Clamp(ReadDouble(CameraFovBox, selected.CameraFov), 20, 140);
+            selected.NearClip = Math.Clamp(ReadDouble(CameraNearBox, selected.NearClip), 0.01, 50);
+            selected.FarClip = Math.Max(selected.NearClip + 0.1, ReadDouble(CameraFarBox, selected.FarClip));
+            selected.AspectRatio = Math.Clamp(ReadDouble(CameraAspectBox, selected.AspectRatio), 0.4, 3.2);
+        }
 
         HierarchyList.Items.Refresh();
         RebuildViewports();
@@ -538,6 +635,7 @@ class PlayerController : Component {
 
     private void RefreshComponentList(SceneObject sceneObject)
     {
+        sceneObject.EnsureCoreComponents();
         ComponentListBox.Items.Clear();
         foreach (var component in sceneObject.Components)
         {
@@ -565,6 +663,21 @@ class PlayerController : Component {
             AttachScriptBox.Items.Add(Path.GetFileName(script));
         }
         AttachScriptBox.SelectedItem = current;
+    }
+
+    private void SetCameraInspectorEnabled(bool enabled)
+    {
+        if (CameraFovBox is null)
+        {
+            return;
+        }
+
+        CameraEnabledBox.IsEnabled = enabled;
+        CameraFrustumBox.IsEnabled = enabled;
+        CameraFovBox.IsEnabled = enabled;
+        CameraNearBox.IsEnabled = enabled;
+        CameraFarBox.IsEnabled = enabled;
+        CameraAspectBox.IsEnabled = enabled;
     }
 
     private void SetActiveTool(TransformTool tool)
@@ -1874,6 +1987,19 @@ class PlayerController : Component {
         StatusText.Text = selected.MeshRendererEnabled ? "Mesh Renderer on" : "Mesh Renderer off";
     }
 
+    private void CameraToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_isUpdatingInspector || HierarchyList.SelectedItem is not SceneObject selected)
+        {
+            return;
+        }
+
+        selected.CameraEnabled = CameraEnabledBox.IsChecked == true;
+        selected.ShowCameraFrustum = CameraFrustumBox.IsChecked == true;
+        RebuildViewports();
+        StatusText.Text = selected.CameraEnabled ? "Camera enabled" : "Camera disabled";
+    }
+
     private void LightingToggle_Changed(object sender, RoutedEventArgs e)
     {
         if (LightingEnabledBox is null || SkyEnabledBox is null)
@@ -2285,6 +2411,44 @@ public sealed class SceneObject
     public bool MeshRendererEnabled { get; set; } = true;
     public List<string> Components { get; } = new() { "Transform", "Mesh Renderer" };
     public string AttachedScript { get; set; } = "";
+    public bool CameraEnabled { get; set; } = true;
+    public bool ShowCameraFrustum { get; set; } = true;
+    public double CameraFov { get; set; } = 62;
+    public double NearClip { get; set; } = 0.1;
+    public double FarClip { get; set; } = 100;
+    public double AspectRatio { get; set; } = 1.777;
+
+    public void SetDefaultComponents()
+    {
+        Components.Clear();
+        Components.AddRange(Type switch
+        {
+            SceneObjectType.Camera => new[] { "Transform", "Camera" },
+            SceneObjectType.DirectionalLight => new[] { "Transform", "Directional Light" },
+            SceneObjectType.PointLight => new[] { "Transform", "Point Light" },
+            SceneObjectType.GameSettings => new[] { "Transform", "Game Settings", "Sky Settings" },
+            SceneObjectType.Plane => new[] { "Transform", "Mesh Renderer", "Collider" },
+            SceneObjectType.ImportedModel => new[] { "Transform", "Mesh Renderer", "Material", "Imported Model" },
+            _ => new[] { "Transform", "Mesh Renderer", "Collider", "Script Component" }
+        });
+    }
+
+    public void EnsureCoreComponents()
+    {
+        if (!Components.Contains("Transform"))
+        {
+            Components.Insert(0, "Transform");
+        }
+
+        if (Type == SceneObjectType.Camera && !Components.Contains("Camera"))
+        {
+            Components.Add("Camera");
+        }
+        if (Type is SceneObjectType.Cube or SceneObjectType.Sphere or SceneObjectType.Plane or SceneObjectType.ImportedModel && !Components.Contains("Mesh Renderer"))
+        {
+            Components.Add("Mesh Renderer");
+        }
+    }
 
     public SceneObject Clone(string name)
     {
@@ -2306,7 +2470,13 @@ public sealed class SceneObject
             LightIntensity = LightIntensity,
             LightColor = LightColor,
             MeshRendererEnabled = MeshRendererEnabled,
-            AttachedScript = AttachedScript
+            AttachedScript = AttachedScript,
+            CameraEnabled = CameraEnabled,
+            ShowCameraFrustum = ShowCameraFrustum,
+            CameraFov = CameraFov,
+            NearClip = NearClip,
+            FarClip = FarClip,
+            AspectRatio = AspectRatio
         };
 
         clone.Components.Clear();
@@ -2457,6 +2627,23 @@ public static class SceneSerializer
             if (sceneObject.Type is SceneObjectType.PointLight or SceneObjectType.DirectionalLight)
             {
                 writer.WriteLine($"        intensity: {sceneObject.LightIntensity:0.###};");
+            }
+            if (sceneObject.Type == SceneObjectType.Camera)
+            {
+                writer.WriteLine($"        cameraEnabled: {sceneObject.CameraEnabled.ToString().ToLowerInvariant()};");
+                writer.WriteLine($"        fov: {sceneObject.CameraFov:0.###};");
+                writer.WriteLine($"        nearClip: {sceneObject.NearClip:0.###};");
+                writer.WriteLine($"        farClip: {sceneObject.FarClip:0.###};");
+                writer.WriteLine($"        aspectRatio: {sceneObject.AspectRatio:0.###};");
+                writer.WriteLine($"        showFrustum: {sceneObject.ShowCameraFrustum.ToString().ToLowerInvariant()};");
+            }
+            if (!string.IsNullOrWhiteSpace(sceneObject.AttachedScript))
+            {
+                writer.WriteLine($"        script: \"{sceneObject.AttachedScript}\";");
+            }
+            if (sceneObject.Components.Count > 0)
+            {
+                writer.WriteLine($"        components: [{string.Join(", ", sceneObject.Components.Select(component => $"\"{component}\""))}];");
             }
             writer.WriteLine("    }");
             writer.WriteLine();

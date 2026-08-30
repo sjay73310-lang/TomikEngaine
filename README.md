@@ -73,6 +73,10 @@ It includes:
 - Asset Browser tree/tiles/preview areas are resizable for small or zoomed-out windows.
 - Inspector is organized into Object, Components, Render, and Lighting tabs.
 - Components tab supports Add Component, Remove Component, and Attach Script.
+- Camera tab supports Camera enabled state, Field Of View, Near Clip, Far Clip, Aspect Ratio, and frustum visibility.
+- Selecting a camera shows a yellow camera frustum in the Scene View so you can see what the camera renders.
+- Game View now uses the selected hierarchy camera object's rotation, FOV, near clip, and far clip.
+- New scene objects get smarter default components based on object type, such as Camera, Point Light, Directional Light, Mesh Renderer, Collider, and Sky Settings.
 - Render tab shows material/shader and Mesh Renderer enabled state for the selected object.
 - Lighting tab has Enable Scene Lighting, Enable Sky, Classic Skybox, and Volumetric Sky settings.
 - Numeric transform fields can be adjusted by dragging left/right; hold Shift while dragging for faster changes.
