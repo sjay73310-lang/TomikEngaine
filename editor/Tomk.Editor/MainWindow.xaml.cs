@@ -18,6 +18,7 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<SceneObject> _sceneObjects = new();
     private readonly ObservableCollection<ShaderAsset> _shaders = new();
     private readonly ObservableCollection<MaterialAsset> _materials = new();
+    private readonly ObservableCollection<AssetBrowserNode> _assetItems = new();
     private readonly Dictionary<string, FloatingPanelState> _floatingPanels = new();
     private readonly Dictionary<Model3D, SceneObject> _modelToObject = new();
     private readonly Dictionary<Model3D, GizmoHit> _gizmoHits = new();
@@ -26,6 +27,10 @@ public partial class MainWindow : Window
     private Point3D _sceneTarget = new(0, 0.8, 0);
     private Point _lastMouse;
     private Point _mouseDownPoint;
+    private Point _numericDragStartPoint;
+    private TextBox? _numericDragBox;
+    private double _numericDragStartValue;
+    private bool _numericDragActive;
     private bool _isOrbitingScene;
     private bool _isPanningScene;
     private bool _isTransformDragging;
@@ -48,6 +53,7 @@ public partial class MainWindow : Window
         HierarchyList.ItemsSource = _sceneObjects;
         ObjectMaterialBox.ItemsSource = _materials;
         MaterialShaderBox.ItemsSource = _shaders;
+        AssetItemsList.ItemsSource = _assetItems;
         AssetCategoryBox.SelectedIndex = 0;
         ScriptBox.Text = """
 class PlayerController : Component {
@@ -175,6 +181,13 @@ class PlayerController : Component {
     private void AddLights(Viewport3D viewport)
     {
         var lights = new Model3DGroup();
+        if (!_sky.LightingEnabled)
+        {
+            lights.Children.Add(new AmbientLight(Color.FromRgb(88, 96, 106)));
+            viewport.Children.Add(new ModelVisual3D { Content = lights });
+            return;
+        }
+
         var ambient = _sky.Mode == SkyMode.Volumetric ? (byte)105 : (byte)80;
         lights.Children.Add(new AmbientLight(Color.FromRgb(ambient, ambient, (byte)Math.Min(255, ambient + 12))));
 
@@ -225,7 +238,9 @@ class PlayerController : Component {
 
         var materialAsset = FindMaterial(sceneObject.MaterialName);
         var shader = FindShader(materialAsset.ShaderName);
-        var color = shader.Kind == ShaderKind.Unlit ? materialAsset.BaseColor : BlendWithSky(materialAsset.BaseColor);
+        var color = sceneObject.MeshRendererEnabled
+            ? shader.Kind == ShaderKind.Unlit ? materialAsset.BaseColor : BlendWithSky(materialAsset.BaseColor)
+            : Color.FromRgb(58, 64, 72);
 
         if (selected)
         {
@@ -279,6 +294,13 @@ class PlayerController : Component {
 
     private void ApplySkyToSurfaces()
     {
+        if (!_sky.SkyEnabled)
+        {
+            SceneViewSurface.Background = new SolidColorBrush(Color.FromRgb(17, 20, 25));
+            GameViewSurface.Background = new SolidColorBrush(Color.FromRgb(5, 6, 9));
+            return;
+        }
+
         if (_sky.Mode == SkyMode.Volumetric)
         {
             var sky = new LinearGradientBrush();
@@ -447,6 +469,7 @@ class PlayerController : Component {
             ScaleXBox.Text = "";
             ScaleYBox.Text = "";
             ScaleZBox.Text = "";
+            ComponentListBox.Items.Clear();
         }
         else
         {
@@ -464,6 +487,9 @@ class PlayerController : Component {
             ObjectMaterialBox.SelectedItem = FindMaterial(sceneObject.MaterialName);
             MaterialShaderBox.SelectedItem = FindShader(FindMaterial(sceneObject.MaterialName).ShaderName);
             ComponentNotesBox.Text = ComponentSummary(sceneObject);
+            MeshRendererEnabledBox.IsChecked = sceneObject.MeshRendererEnabled;
+            RefreshComponentList(sceneObject);
+            RefreshScriptDropdown();
         }
 
         _isUpdatingInspector = false;
@@ -503,10 +529,42 @@ class PlayerController : Component {
         {
             selected.MaterialName = materialAsset.Name;
         }
+        selected.MeshRendererEnabled = MeshRendererEnabledBox.IsChecked == true;
 
         HierarchyList.Items.Refresh();
         RebuildViewports();
         StatusText.Text = $"Updated {selected.Name}";
+    }
+
+    private void RefreshComponentList(SceneObject sceneObject)
+    {
+        ComponentListBox.Items.Clear();
+        foreach (var component in sceneObject.Components)
+        {
+            ComponentListBox.Items.Add(component);
+        }
+        if (!string.IsNullOrWhiteSpace(sceneObject.AttachedScript))
+        {
+            ComponentListBox.Items.Add($"Script: {sceneObject.AttachedScript}");
+        }
+    }
+
+    private void RefreshScriptDropdown()
+    {
+        if (AttachScriptBox is null)
+        {
+            return;
+        }
+
+        var current = AttachScriptBox.SelectedItem;
+        AttachScriptBox.Items.Clear();
+        var scriptFolder = Path.Combine(CurrentProjectPath(), "scripts");
+        Directory.CreateDirectory(scriptFolder);
+        foreach (var script in Directory.GetFiles(scriptFolder, "*.tomk").OrderBy(Path.GetFileName))
+        {
+            AttachScriptBox.Items.Add(Path.GetFileName(script));
+        }
+        AttachScriptBox.SelectedItem = current;
     }
 
     private void SetActiveTool(TransformTool tool)
@@ -779,6 +837,7 @@ class PlayerController : Component {
         }
 
         AssetTree.Items.Clear();
+        _assetItems.Clear();
         var projectPath = CurrentProjectPath();
         if (!Directory.Exists(projectPath))
         {
@@ -806,9 +865,42 @@ class PlayerController : Component {
             {
                 AssetTree.Items.Add(root);
             }
+
+            AddAssetTiles(folderPath, projectPath, assetCategory.Name, search);
         }
 
         AssetPathText.Text = $"{_currentProjectName} / {category}";
+        RefreshScriptDropdown();
+    }
+
+    private void AddAssetTiles(string folderPath, string projectPath, string category, string search)
+    {
+        foreach (var directory in Directory.GetDirectories(folderPath, "*", SearchOption.AllDirectories).OrderBy(Path.GetFileName))
+        {
+            var name = Path.GetFileName(directory);
+            var relativePath = Path.GetRelativePath(projectPath, directory);
+            if (MatchesAssetSearch(name, relativePath, search))
+            {
+                _assetItems.Add(new AssetBrowserNode(name, directory, relativePath, true, category));
+            }
+        }
+
+        foreach (var file in Directory.GetFiles(folderPath, "*", SearchOption.AllDirectories).OrderBy(Path.GetFileName))
+        {
+            var name = Path.GetFileName(file);
+            var relativePath = Path.GetRelativePath(projectPath, file);
+            if (MatchesAssetSearch(name, relativePath, search))
+            {
+                _assetItems.Add(new AssetBrowserNode(name, file, relativePath, false, category));
+            }
+        }
+    }
+
+    private static bool MatchesAssetSearch(string name, string relativePath, string search)
+    {
+        return string.IsNullOrWhiteSpace(search)
+            || name.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || relativePath.Contains(search, StringComparison.OrdinalIgnoreCase);
     }
 
     private void AddAssetFolderChildren(TreeViewItem parent, string folderPath, string projectPath, string category, string search)
@@ -854,7 +946,7 @@ class PlayerController : Component {
         return AssetCategoryBox?.SelectedItem is ComboBoxItem item && item.Content is string value ? value : "All";
     }
 
-    private static string AssetIconFor(string file)
+    public static string AssetIconFor(string file)
     {
         return Path.GetExtension(file).ToLowerInvariant() switch
         {
@@ -874,6 +966,11 @@ class PlayerController : Component {
 
     private AssetBrowserNode? SelectedAssetNode()
     {
+        if (AssetItemsList.SelectedItem is AssetBrowserNode tileNode)
+        {
+            return tileNode;
+        }
+
         return AssetTree.SelectedItem is TreeViewItem item ? item.Tag as AssetBrowserNode : null;
     }
 
@@ -1358,6 +1455,46 @@ class PlayerController : Component {
         AssetPreviewPath.Text = node.RelativePath;
     }
 
+    private void AssetItemsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        var node = SelectedAssetNode();
+        if (node is null)
+        {
+            return;
+        }
+
+        AssetPreviewTitle.Text = node.Name;
+        AssetPreviewKind.Text = node.IsDirectory ? $"{node.Category} Folder" : $"{node.Category} Asset";
+        AssetPreviewPath.Text = node.RelativePath;
+    }
+
+    private void AssetItemsList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        var node = SelectedAssetNode();
+        if (node is null)
+        {
+            return;
+        }
+
+        if (node.IsDirectory)
+        {
+            AssetCategoryBox.SelectedItem = AssetCategoryBox.Items.OfType<ComboBoxItem>().FirstOrDefault(item => (string)item.Content == node.Category);
+            AssetSearchBox.Text = "";
+            RefreshProjectFiles();
+            return;
+        }
+
+        AddSelectedAssetToSceneMenuItem_Click(sender, e);
+    }
+
+    private void AssetZoomSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (AssetPathText is not null)
+        {
+            AssetPathText.Text = $"{_currentProjectName} / {SelectedAssetCategory()} / Tile {e.NewValue:0}px";
+        }
+    }
+
     private void AssetTree_DragOver(object sender, DragEventArgs e)
     {
         e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
@@ -1403,6 +1540,59 @@ class PlayerController : Component {
         {
             ImportFilesToProject(dialog.FileNames, addModelsToScene: false);
         }
+    }
+
+    private void AddComponentButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (HierarchyList.SelectedItem is not SceneObject selected || AddComponentBox.SelectedItem is not ComboBoxItem item)
+        {
+            return;
+        }
+
+        var component = item.Content?.ToString() ?? "Component";
+        if (!selected.Components.Contains(component))
+        {
+            selected.Components.Add(component);
+            RefreshComponentList(selected);
+            Log($"Added component {component} to {selected.Name}.");
+        }
+    }
+
+    private void RemoveComponentButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (HierarchyList.SelectedItem is not SceneObject selected || ComponentListBox.SelectedItem is not string component)
+        {
+            return;
+        }
+
+        if (component.StartsWith("Script:", StringComparison.OrdinalIgnoreCase))
+        {
+            selected.AttachedScript = "";
+        }
+        else
+        {
+            selected.Components.Remove(component);
+        }
+
+        RefreshComponentList(selected);
+        Log($"Removed component from {selected.Name}: {component}");
+    }
+
+    private void AttachScriptButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (HierarchyList.SelectedItem is not SceneObject selected || AttachScriptBox.SelectedItem is not string scriptName)
+        {
+            return;
+        }
+
+        selected.AttachedScript = scriptName;
+        if (!selected.Components.Contains("Script Component"))
+        {
+            selected.Components.Add("Script Component");
+        }
+
+        RefreshComponentList(selected);
+        Log($"Attached script {scriptName} to {selected.Name}.");
     }
 
     private void AddSelectedAssetToSceneMenuItem_Click(object sender, RoutedEventArgs e)
@@ -1672,6 +1862,31 @@ class PlayerController : Component {
         }
     }
 
+    private void RendererToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_isUpdatingInspector || HierarchyList.SelectedItem is not SceneObject selected)
+        {
+            return;
+        }
+
+        selected.MeshRendererEnabled = MeshRendererEnabledBox.IsChecked == true;
+        RebuildViewports();
+        StatusText.Text = selected.MeshRendererEnabled ? "Mesh Renderer on" : "Mesh Renderer off";
+    }
+
+    private void LightingToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (LightingEnabledBox is null || SkyEnabledBox is null)
+        {
+            return;
+        }
+
+        _sky.LightingEnabled = LightingEnabledBox.IsChecked == true;
+        _sky.SkyEnabled = SkyEnabledBox.IsChecked == true;
+        RebuildViewports();
+        StatusText.Text = $"Lighting {(_sky.LightingEnabled ? "on" : "off")}, Sky {(_sky.SkyEnabled ? "on" : "off")}";
+    }
+
     private void SkyModeBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_isUpdatingInspector)
@@ -1711,6 +1926,69 @@ class PlayerController : Component {
         {
             return fallback;
         }
+    }
+
+    private void NumericBox_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not TextBox box || !double.TryParse(box.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
+        {
+            return;
+        }
+
+        _numericDragBox = box;
+        _numericDragStartValue = value;
+        _numericDragStartPoint = e.GetPosition(this);
+        _numericDragActive = true;
+        box.CaptureMouse();
+        box.Cursor = Cursors.SizeWE;
+    }
+
+    private void NumericBox_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (!_numericDragActive || _numericDragBox is null || sender != _numericDragBox || e.LeftButton != MouseButtonState.Pressed)
+        {
+            return;
+        }
+
+        var current = e.GetPosition(this);
+        var deltaX = current.X - _numericDragStartPoint.X;
+        var multiplier = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) ? 0.1 : 0.02;
+        if (_numericDragBox == RotXBox || _numericDragBox == RotYBox || _numericDragBox == RotZBox)
+        {
+            multiplier = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) ? 1.0 : 0.25;
+        }
+
+        var value = _numericDragStartValue + deltaX * multiplier;
+        if (_numericDragBox == ScaleXBox || _numericDragBox == ScaleYBox || _numericDragBox == ScaleZBox || _numericDragBox == CloudDensityBox)
+        {
+            value = Math.Max(0, value);
+        }
+        if (_numericDragBox == CloudDensityBox)
+        {
+            value = Math.Clamp(value, 0, 1);
+        }
+
+        _numericDragBox.Text = Format(value);
+        if (_numericDragBox == CloudDensityBox)
+        {
+            ApplySkyButton_Click(sender, new RoutedEventArgs());
+        }
+        else
+        {
+            ApplyInspector();
+        }
+    }
+
+    private void NumericBox_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (_numericDragBox is not null)
+        {
+            _numericDragBox.ReleaseMouseCapture();
+            _numericDragBox.Cursor = Cursors.IBeam;
+        }
+
+        _numericDragActive = false;
+        _numericDragBox = null;
     }
 
     private void BuildGameButton_Click(object sender, RoutedEventArgs e)
@@ -2004,10 +2282,13 @@ public sealed class SceneObject
     public string SourceAsset { get; set; } = "";
     public double LightIntensity { get; set; } = 1.0;
     public Color LightColor { get; set; } = Color.FromRgb(235, 241, 255);
+    public bool MeshRendererEnabled { get; set; } = true;
+    public List<string> Components { get; } = new() { "Transform", "Mesh Renderer" };
+    public string AttachedScript { get; set; } = "";
 
     public SceneObject Clone(string name)
     {
-        return new SceneObject
+        var clone = new SceneObject
         {
             Name = name,
             Type = Type,
@@ -2023,8 +2304,14 @@ public sealed class SceneObject
             MaterialName = MaterialName,
             SourceAsset = SourceAsset,
             LightIntensity = LightIntensity,
-            LightColor = LightColor
+            LightColor = LightColor,
+            MeshRendererEnabled = MeshRendererEnabled,
+            AttachedScript = AttachedScript
         };
+
+        clone.Components.Clear();
+        clone.Components.AddRange(Components);
+        return clone;
     }
 }
 
@@ -2063,9 +2350,14 @@ public sealed class SkySettings
     public Color SkyColor { get; set; } = Color.FromRgb(79, 134, 198);
     public Color HorizonColor { get; set; } = Color.FromRgb(215, 237, 245);
     public double CloudDensity { get; set; } = 0.45;
+    public bool LightingEnabled { get; set; } = true;
+    public bool SkyEnabled { get; set; } = true;
 }
 
-public sealed record AssetBrowserNode(string Name, string FullPath, string RelativePath, bool IsDirectory, string Category);
+public sealed record AssetBrowserNode(string Name, string FullPath, string RelativePath, bool IsDirectory, string Category)
+{
+    public string Icon => IsDirectory ? "[Folder]" : MainWindow.AssetIconFor(FullPath);
+}
 
 public sealed record AssetCategory(string Name, string RelativePath, string Icon)
 {

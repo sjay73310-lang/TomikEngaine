@@ -69,6 +69,13 @@ It includes:
 - Asset Browser works like a project file explorer with category folders, search, preview, drag-drop, and right-click actions.
 - Asset categories include Models, Materials, Shaders, Textures, Scripts, Scenes, Objects, Audio, and Imports.
 - Right-click assets to add supported models/objects to the scene, import model/texture files, create shaders/materials/scripts/object files, reveal in Explorer, or refresh.
+- Asset Browser now has an Explorer-style tile grid, preview/details area, category sidebar, search, and zoom slider.
+- Asset Browser tree/tiles/preview areas are resizable for small or zoomed-out windows.
+- Inspector is organized into Object, Components, Render, and Lighting tabs.
+- Components tab supports Add Component, Remove Component, and Attach Script.
+- Render tab shows material/shader and Mesh Renderer enabled state for the selected object.
+- Lighting tab has Enable Scene Lighting, Enable Sky, Classic Skybox, and Volumetric Sky settings.
+- Numeric transform fields can be adjusted by dragging left/right; hold Shift while dragging for faster changes.
 - Window layout supports resizable panels with splitters.
 - Hierarchy, Inspector, Asset Browser, Console, and Tomk Script panels can float in separate movable/resizable windows.
 - Window menu can save a personal layout, load it again, or reset the editor layout.

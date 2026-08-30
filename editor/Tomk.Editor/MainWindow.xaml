@@ -154,12 +154,16 @@
       <GridSplitter Grid.Row="0" Grid.Column="3" Width="5" HorizontalAlignment="Stretch" Background="#303640"/>
 
       <Border x:Name="InspectorPanelHost" Grid.Row="0" Grid.Column="4" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="0,0,0,1">
-        <ScrollViewer VerticalScrollBarVisibility="Auto">
-          <StackPanel Margin="12">
-            <DockPanel Margin="0,0,0,10">
-              <Button Content="Float" DockPanel.Dock="Right" Padding="7,3" Click="DetachInspectorMenuItem_Click"/>
-              <TextBlock Text="Inspector" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center"/>
-            </DockPanel>
+        <DockPanel Margin="12">
+          <DockPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+            <Button Content="Float" DockPanel.Dock="Right" Padding="7,3" Click="DetachInspectorMenuItem_Click"/>
+            <TextBlock Text="Inspector" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center"/>
+          </DockPanel>
+
+          <TabControl x:Name="InspectorTabs">
+            <TabItem Header="Object">
+              <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="4">
 
             <TextBlock Text="Name" Foreground="{StaticResource MutedTextBrush}"/>
             <TextBox x:Name="NameBox" TextChanged="Inspector_TextChanged"/>
@@ -187,9 +191,9 @@
                 <ColumnDefinition/>
                 <ColumnDefinition/>
               </Grid.ColumnDefinitions>
-              <TextBox x:Name="PosXBox" Grid.Column="0" Margin="0,3,5,8" TextChanged="Inspector_TextChanged"/>
-              <TextBox x:Name="PosYBox" Grid.Column="1" Margin="0,3,5,8" TextChanged="Inspector_TextChanged"/>
-              <TextBox x:Name="PosZBox" Grid.Column="2" Margin="0,3,0,8" TextChanged="Inspector_TextChanged"/>
+              <TextBox x:Name="PosXBox" Grid.Column="0" Margin="0,3,5,8" TextChanged="Inspector_TextChanged" PreviewMouseLeftButtonDown="NumericBox_MouseLeftButtonDown" PreviewMouseMove="NumericBox_MouseMove" PreviewMouseLeftButtonUp="NumericBox_MouseLeftButtonUp"/>
+              <TextBox x:Name="PosYBox" Grid.Column="1" Margin="0,3,5,8" TextChanged="Inspector_TextChanged" PreviewMouseLeftButtonDown="NumericBox_MouseLeftButtonDown" PreviewMouseMove="NumericBox_MouseMove" PreviewMouseLeftButtonUp="NumericBox_MouseLeftButtonUp"/>
+              <TextBox x:Name="PosZBox" Grid.Column="2" Margin="0,3,0,8" TextChanged="Inspector_TextChanged" PreviewMouseLeftButtonDown="NumericBox_MouseLeftButtonDown" PreviewMouseMove="NumericBox_MouseMove" PreviewMouseLeftButtonUp="NumericBox_MouseLeftButtonUp"/>
             </Grid>
 
             <TextBlock Text="Rotation" FontWeight="SemiBold" Margin="0,8,0,4"/>
@@ -204,9 +208,9 @@
                 <ColumnDefinition/>
                 <ColumnDefinition/>
               </Grid.ColumnDefinitions>
-              <TextBox x:Name="RotXBox" Grid.Column="0" Margin="0,3,5,8" TextChanged="Inspector_TextChanged"/>
-              <TextBox x:Name="RotYBox" Grid.Column="1" Margin="0,3,5,8" TextChanged="Inspector_TextChanged"/>
-              <TextBox x:Name="RotZBox" Grid.Column="2" Margin="0,3,0,8" TextChanged="Inspector_TextChanged"/>
+              <TextBox x:Name="RotXBox" Grid.Column="0" Margin="0,3,5,8" TextChanged="Inspector_TextChanged" PreviewMouseLeftButtonDown="NumericBox_MouseLeftButtonDown" PreviewMouseMove="NumericBox_MouseMove" PreviewMouseLeftButtonUp="NumericBox_MouseLeftButtonUp"/>
+              <TextBox x:Name="RotYBox" Grid.Column="1" Margin="0,3,5,8" TextChanged="Inspector_TextChanged" PreviewMouseLeftButtonDown="NumericBox_MouseLeftButtonDown" PreviewMouseMove="NumericBox_MouseMove" PreviewMouseLeftButtonUp="NumericBox_MouseLeftButtonUp"/>
+              <TextBox x:Name="RotZBox" Grid.Column="2" Margin="0,3,0,8" TextChanged="Inspector_TextChanged" PreviewMouseLeftButtonDown="NumericBox_MouseLeftButtonDown" PreviewMouseMove="NumericBox_MouseMove" PreviewMouseLeftButtonUp="NumericBox_MouseLeftButtonUp"/>
             </Grid>
 
             <TextBlock Text="Scale" FontWeight="SemiBold" Margin="0,8,0,4"/>
@@ -221,9 +225,9 @@
                 <ColumnDefinition/>
                 <ColumnDefinition/>
               </Grid.ColumnDefinitions>
-              <TextBox x:Name="ScaleXBox" Grid.Column="0" Margin="0,3,5,8" TextChanged="Inspector_TextChanged"/>
-              <TextBox x:Name="ScaleYBox" Grid.Column="1" Margin="0,3,5,8" TextChanged="Inspector_TextChanged"/>
-              <TextBox x:Name="ScaleZBox" Grid.Column="2" Margin="0,3,0,8" TextChanged="Inspector_TextChanged"/>
+              <TextBox x:Name="ScaleXBox" Grid.Column="0" Margin="0,3,5,8" TextChanged="Inspector_TextChanged" PreviewMouseLeftButtonDown="NumericBox_MouseLeftButtonDown" PreviewMouseMove="NumericBox_MouseMove" PreviewMouseLeftButtonUp="NumericBox_MouseLeftButtonUp"/>
+              <TextBox x:Name="ScaleYBox" Grid.Column="1" Margin="0,3,5,8" TextChanged="Inspector_TextChanged" PreviewMouseLeftButtonDown="NumericBox_MouseLeftButtonDown" PreviewMouseMove="NumericBox_MouseMove" PreviewMouseLeftButtonUp="NumericBox_MouseLeftButtonUp"/>
+              <TextBox x:Name="ScaleZBox" Grid.Column="2" Margin="0,3,0,8" TextChanged="Inspector_TextChanged" PreviewMouseLeftButtonDown="NumericBox_MouseLeftButtonDown" PreviewMouseMove="NumericBox_MouseMove" PreviewMouseLeftButtonUp="NumericBox_MouseLeftButtonUp"/>
             </Grid>
 
             <StackPanel Orientation="Horizontal" Margin="0,8,0,14">
@@ -231,7 +235,45 @@
               <Button Content="Duplicate" Click="DuplicateButton_Click"/>
               <Button Content="Delete" Click="DeleteButton_Click"/>
             </StackPanel>
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
 
+            <TabItem Header="Components">
+              <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="4">
+                  <TextBlock Text="Object Components" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                  <ListBox x:Name="ComponentListBox" Height="120" Margin="0,0,0,8"/>
+                  <TextBlock Text="Add Component" Foreground="{StaticResource MutedTextBrush}"/>
+                  <ComboBox x:Name="AddComponentBox" Margin="0,3,0,8">
+                    <ComboBoxItem Content="Mesh Renderer"/>
+                    <ComboBoxItem Content="Collider"/>
+                    <ComboBoxItem Content="Rigid Body"/>
+                    <ComboBoxItem Content="Script Component"/>
+                    <ComboBoxItem Content="FPS Controller"/>
+                    <ComboBoxItem Content="Audio Source"/>
+                    <ComboBoxItem Content="Particle Emitter"/>
+                  </ComboBox>
+                  <UniformGrid Columns="2" Margin="0,0,0,12">
+                    <Button Content="Add" Click="AddComponentButton_Click"/>
+                    <Button Content="Remove" Click="RemoveComponentButton_Click"/>
+                  </UniformGrid>
+                  <TextBlock Text="Attach Script" Foreground="{StaticResource MutedTextBrush}"/>
+                  <ComboBox x:Name="AttachScriptBox" Margin="0,3,0,8"/>
+                  <Button Content="Attach Selected Script" Click="AttachScriptButton_Click"/>
+                  <TextBlock Text="Component Notes" FontWeight="SemiBold" Margin="0,12,0,4"/>
+                  <TextBox x:Name="ComponentNotesBox"
+                           Height="120"
+                           AcceptsReturn="True"
+                           TextWrapping="Wrap"
+                           Text="Transform, Mesh Renderer, Collider, Script Component"/>
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="Render">
+              <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="4">
             <TextBlock Text="Material" FontWeight="SemiBold" Margin="0,4,0,4"/>
             <ComboBox x:Name="ObjectMaterialBox" DisplayMemberPath="Name" SelectionChanged="ObjectMaterialBox_SelectionChanged" Margin="0,3,0,8"/>
             <UniformGrid Columns="2" Margin="0,0,0,8">
@@ -245,7 +287,19 @@
               <Button Content="New Shader" Click="NewShaderMenuItem_Click"/>
               <Button Content="Save Material" Click="SaveMaterialButton_Click"/>
             </UniformGrid>
+                  <TextBlock Text="Mesh Renderer" FontWeight="SemiBold" Margin="0,10,0,4"/>
+                  <CheckBox x:Name="MeshRendererEnabledBox" Content="Enabled" IsChecked="True" Checked="RendererToggle_Changed" Unchecked="RendererToggle_Changed"/>
+                  <TextBlock Text="Only render properties are shown here. Transform stays in Object tab." Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
 
+            <TabItem Header="Lighting">
+              <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="4">
+            <TextBlock Text="Lighting" FontWeight="SemiBold" Margin="0,0,0,4"/>
+            <CheckBox x:Name="LightingEnabledBox" Content="Enable Scene Lighting" IsChecked="True" Checked="LightingToggle_Changed" Unchecked="LightingToggle_Changed" Margin="0,0,0,8"/>
+            <CheckBox x:Name="SkyEnabledBox" Content="Enable Sky" IsChecked="True" Checked="LightingToggle_Changed" Unchecked="LightingToggle_Changed" Margin="0,0,0,8"/>
             <TextBlock Text="Sky" FontWeight="SemiBold" Margin="0,6,0,4"/>
             <ComboBox x:Name="SkyModeBox" SelectionChanged="SkyModeBox_SelectionChanged" Margin="0,3,0,8">
               <ComboBoxItem Content="Classic Skybox"/>
@@ -256,17 +310,14 @@
             <TextBlock Text="Horizon Color" Foreground="{StaticResource MutedTextBrush}"/>
             <TextBox x:Name="HorizonColorBox" Text="#d7edf5"/>
             <TextBlock Text="Cloud Density" Foreground="{StaticResource MutedTextBrush}"/>
-            <TextBox x:Name="CloudDensityBox" Text="0.45"/>
+            <TextBox x:Name="CloudDensityBox" Text="0.45" PreviewMouseLeftButtonDown="NumericBox_MouseLeftButtonDown" PreviewMouseMove="NumericBox_MouseMove" PreviewMouseLeftButtonUp="NumericBox_MouseLeftButtonUp"/>
             <Button Content="Apply Sky" Click="ApplySkyButton_Click" Margin="0,0,0,12"/>
-
-            <TextBlock Text="Component Notes" FontWeight="SemiBold" Margin="0,8,0,4"/>
-            <TextBox x:Name="ComponentNotesBox"
-                     Height="120"
-                     AcceptsReturn="True"
-                     TextWrapping="Wrap"
-                     Text="Transform, Mesh Renderer, Collider, Script Component"/>
-          </StackPanel>
-        </ScrollViewer>
+                  <TextBlock Text="Light objects can be added from GameObject menu or the Hierarchy + Light button." Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
+          </TabControl>
+        </DockPanel>
       </Border>
 
       <GridSplitter Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="5" Height="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="#303640"/>
@@ -308,6 +359,10 @@
                   <ComboBoxItem Content="Audio"/>
                   <ComboBoxItem Content="Imports"/>
                 </ComboBox>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                  <TextBlock Text="Zoom" Foreground="#aeb6c2" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                  <Slider x:Name="AssetZoomSlider" Width="120" Minimum="92" Maximum="180" Value="116" ValueChanged="AssetZoomSlider_ValueChanged"/>
+                </StackPanel>
                 <TextBlock x:Name="AssetPathText" Text="Project Assets" Foreground="#aeb6c2" VerticalAlignment="Center"/>
               </DockPanel>
 
@@ -352,7 +407,55 @@
                   <Button Content="Refresh" Click="RefreshProjectFilesButton_Click"/>
                 </WrapPanel>
 
-                <Border Background="#101216" BorderBrush="#3c424d" BorderThickness="1" Padding="10">
+                <Grid>
+                  <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="6"/>
+                    <RowDefinition Height="110"/>
+                  </Grid.RowDefinitions>
+
+                  <ListBox x:Name="AssetItemsList"
+                           Grid.Row="0"
+                           SelectionChanged="AssetItemsList_SelectionChanged"
+                           MouseDoubleClick="AssetItemsList_MouseDoubleClick"
+                           AllowDrop="True"
+                           DragOver="AssetTree_DragOver"
+                           Drop="AssetTree_Drop"
+                           Background="#101216"
+                           BorderBrush="#3c424d"
+                           ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <WrapPanel/>
+                      </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+                    <ListBox.ItemTemplate>
+                      <DataTemplate>
+                        <Border Width="{Binding Value, ElementName=AssetZoomSlider}" Height="{Binding Value, ElementName=AssetZoomSlider}" Background="#18202a" BorderBrush="#334153" BorderThickness="1" Margin="5" Padding="7">
+                          <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Icon}" FontSize="24" HorizontalAlignment="Center" Foreground="#f2c94c"/>
+                            <TextBlock Text="{Binding Name}" TextWrapping="Wrap" TextAlignment="Center" Foreground="#eef2f7" Margin="0,7,0,0"/>
+                            <TextBlock Text="{Binding Category}" TextAlignment="Center" Foreground="#8f9bad" FontSize="11"/>
+                          </StackPanel>
+                        </Border>
+                      </DataTemplate>
+                    </ListBox.ItemTemplate>
+                    <ListBox.ContextMenu>
+                      <ContextMenu>
+                        <MenuItem Header="Add To Scene" Click="AddSelectedAssetToSceneMenuItem_Click"/>
+                        <MenuItem Header="Reveal In Explorer" Click="RevealAssetMenuItem_Click"/>
+                        <Separator/>
+                        <MenuItem Header="Import Model" Click="ImportModelMenuItem_Click"/>
+                        <MenuItem Header="Import Texture" Click="ImportTextureMenuItem_Click"/>
+                        <MenuItem Header="New Shader" Click="NewShaderMenuItem_Click"/>
+                        <MenuItem Header="New Material" Click="NewMaterialMenuItem_Click"/>
+                      </ContextMenu>
+                    </ListBox.ContextMenu>
+                  </ListBox>
+
+                  <GridSplitter Grid.Row="1" Height="6" HorizontalAlignment="Stretch" Background="#303b49"/>
+
+                <Border Grid.Row="2" Background="#101216" BorderBrush="#3c424d" BorderThickness="1" Padding="10">
                   <StackPanel>
                     <TextBlock x:Name="AssetPreviewTitle" Text="Asset Inspector" FontWeight="SemiBold" Foreground="#eef2f7"/>
                     <TextBlock x:Name="AssetPreviewKind" Text="Select any project file" Foreground="#aeb6c2" Margin="0,4,0,0"/>
@@ -360,6 +463,7 @@
                     <TextBlock Text="Right-click assets to import, create, reveal, or add supported files to the scene." Foreground="#aeb6c2" TextWrapping="Wrap" Margin="0,10,0,0"/>
                   </StackPanel>
                 </Border>
+                </Grid>
               </DockPanel>
             </Grid>
           </TabItem>
