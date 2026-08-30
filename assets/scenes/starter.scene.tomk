@@ -1,0 +1,17 @@
+scene "Starter Scene" {
+    camera "Main Camera" {
+        position: Vector3(0, 2, -6);
+        rotation: Vector3(15, 0, 0);
+    }
+
+    light "Sun" {
+        type: Directional;
+        intensity: 1.0;
+    }
+
+    entity "Test Cube" {
+        mesh: "assets/models/cube.glb";
+        material: "assets/materials/default.mat";
+        position: Vector3(0, 0, 0);
+    }
+}

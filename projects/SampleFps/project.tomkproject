@@ -1,0 +1,3 @@
+project "SampleFps" {
+    startupScene: "scenes/main.scene.tomk";
+}

@@ -1,0 +1,7 @@
+class TomkBehaviour020618 : Component {
+    fn start() {
+    }
+
+    fn update(delta: float) {
+    }
+}

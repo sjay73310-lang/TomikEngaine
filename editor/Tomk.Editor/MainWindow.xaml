@@ -1,0 +1,249 @@
+<Window x:Class="Tomk.Editor.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Tomk Engine Editor"
+        Width="1360"
+        Height="820"
+        MinWidth="1060"
+        MinHeight="680"
+        WindowStartupLocation="CenterScreen"
+        ShowActivated="True"
+        KeyDown="Window_KeyDown">
+  <DockPanel LastChildFill="True">
+    <Menu DockPanel.Dock="Top" Background="#181b20" Foreground="{StaticResource TextBrush}" BorderBrush="#3b424d">
+      <MenuItem Header="_File">
+        <MenuItem Header="Create New Project" Click="CreateNewProjectMenuItem_Click"/>
+        <Separator/>
+        <MenuItem Header="New Object" Click="NewObjectMenuItem_Click"/>
+        <MenuItem Header="New Script" Click="NewScriptMenuItem_Click"/>
+        <Separator/>
+        <MenuItem Header="Save Scene" Click="SaveSceneButton_Click"/>
+      </MenuItem>
+      <MenuItem Header="_Edit">
+        <MenuItem Header="Duplicate" Click="DuplicateButton_Click"/>
+        <MenuItem Header="Delete Selected" Click="DeleteButton_Click"/>
+      </MenuItem>
+      <MenuItem Header="_View">
+        <MenuItem Header="Frame Selected" Click="FrameSelectedMenuItem_Click"/>
+        <MenuItem Header="Reset Camera" Click="ResetCameraMenuItem_Click"/>
+      </MenuItem>
+    </Menu>
+
+    <Border DockPanel.Dock="Top" Background="#20242b" BorderBrush="#3b424d" BorderThickness="0,0,0,1" Height="48">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="240"/>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="340"/>
+        </Grid.ColumnDefinitions>
+
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0">
+          <TextBlock Text="TOMK" FontWeight="Bold" FontSize="18" Foreground="#4fb477" VerticalAlignment="Center"/>
+          <TextBlock Text=" Engine" FontWeight="SemiBold" FontSize="18" VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
+          <Button x:Name="SelectToolButton" Content="Select" Click="SelectToolButton_Click"/>
+          <Button x:Name="MoveToolButton" Content="Move" Click="MoveToolButton_Click"/>
+          <Button x:Name="RotateToolButton" Content="Rotate" Click="RotateToolButton_Click"/>
+          <Button x:Name="ScaleToolButton" Content="Scale" Click="ScaleToolButton_Click"/>
+          <Button x:Name="PlayButton" Content="Play" Click="PlayButton_Click"/>
+          <Button x:Name="PauseButton" Content="Pause" Click="PauseButton_Click"/>
+          <Button Content="Save Scene" Click="SaveSceneButton_Click"/>
+          <Button Content="Build Game" Click="BuildGameButton_Click"/>
+        </StackPanel>
+
+        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,12,0">
+          <TextBox x:Name="ProjectNameBox" Width="130" Height="28" Text="SampleFps" Margin="0,0,6,0"/>
+          <Button Content="New Project" Click="CreateNewProjectButton_Click"/>
+          <TextBlock x:Name="StatusText" Text="Editor ready" Foreground="#aeb6c2" VerticalAlignment="Center" Margin="8,0,0,0"/>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <Grid>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="250"/>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="320"/>
+      </Grid.ColumnDefinitions>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="*"/>
+        <RowDefinition Height="170"/>
+      </Grid.RowDefinitions>
+
+      <Border Grid.Row="0" Grid.Column="0" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="0,0,1,1">
+        <DockPanel Margin="10">
+          <TextBlock DockPanel.Dock="Top" Text="Hierarchy" FontWeight="SemiBold" FontSize="15" Margin="0,0,0,8"/>
+          <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,8,0,0">
+            <Button Content="+ Cube" Click="AddCubeButton_Click"/>
+            <Button Content="+ Sphere" Click="AddSphereButton_Click"/>
+            <Button Content="+ Plane" Click="AddPlaneButton_Click"/>
+          </StackPanel>
+          <ListBox x:Name="HierarchyList"
+                   DisplayMemberPath="Name"
+                   SelectionChanged="HierarchyList_SelectionChanged"/>
+        </DockPanel>
+      </Border>
+
+      <Border Grid.Row="0" Grid.Column="1" Background="#111318" BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="0,0,1,1">
+        <TabControl x:Name="ViewTabs">
+          <TabItem Header="Scene View">
+            <Grid x:Name="SceneViewSurface"
+                  Background="#111318"
+                  Focusable="True"
+                  MouseDown="SceneViewSurface_MouseDown"
+                  MouseMove="SceneViewSurface_MouseMove"
+                  MouseUp="SceneViewSurface_MouseUp"
+                  MouseWheel="SceneViewSurface_MouseWheel">
+              <Viewport3D x:Name="SceneViewport"/>
+              <Border Background="#aa15171b" BorderBrush="#3c424d" BorderThickness="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12" Padding="10,6">
+                <StackPanel>
+                  <TextBlock x:Name="SceneHelpText" Text="Scene View  |  Left click: select/gizmo  |  Right drag: orbit  |  Middle drag: pan  |  Wheel: zoom" Foreground="#dce4ee"/>
+                  <TextBlock x:Name="ToolHelpText" Text="Tool: Select  |  W/E/R tools  |  WASD/QZ camera  |  Del delete" Foreground="#aeb6c2" Margin="0,3,0,0"/>
+                </StackPanel>
+              </Border>
+            </Grid>
+          </TabItem>
+          <TabItem Header="Game View">
+            <Grid Background="#050609">
+              <Viewport3D x:Name="GameViewport"/>
+              <Border Background="#aa15171b" BorderBrush="#3c424d" BorderThickness="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12" Padding="10,6">
+                <TextBlock x:Name="GameOverlayText" Text="Press Play to preview the scene" Foreground="#dce4ee"/>
+              </Border>
+            </Grid>
+          </TabItem>
+        </TabControl>
+      </Border>
+
+      <Border Grid.Row="0" Grid.Column="2" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="0,0,0,1">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Margin="12">
+            <TextBlock Text="Inspector" FontWeight="SemiBold" FontSize="15" Margin="0,0,0,10"/>
+
+            <TextBlock Text="Name" Foreground="{StaticResource MutedTextBrush}"/>
+            <TextBox x:Name="NameBox" TextChanged="Inspector_TextChanged"/>
+
+            <TextBlock Text="Type" Foreground="{StaticResource MutedTextBrush}"/>
+            <TextBox x:Name="TypeBox" IsReadOnly="True"/>
+
+            <TextBlock Text="Transform Tool" FontWeight="SemiBold" Margin="0,8,0,4"/>
+            <UniformGrid Columns="4" Margin="0,0,0,10">
+              <Button Content="Select" Click="SelectToolButton_Click"/>
+              <Button Content="Move" Click="MoveToolButton_Click"/>
+              <Button Content="Rotate" Click="RotateToolButton_Click"/>
+              <Button Content="Scale" Click="ScaleToolButton_Click"/>
+            </UniformGrid>
+
+            <TextBlock Text="Position" FontWeight="SemiBold" Margin="0,8,0,4"/>
+            <UniformGrid Columns="3">
+              <TextBlock Text="X" Foreground="#df5959" HorizontalAlignment="Center"/>
+              <TextBlock Text="Y" Foreground="#4fb477" HorizontalAlignment="Center"/>
+              <TextBlock Text="Z" Foreground="#579de0" HorizontalAlignment="Center"/>
+            </UniformGrid>
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition/>
+                <ColumnDefinition/>
+                <ColumnDefinition/>
+              </Grid.ColumnDefinitions>
+              <TextBox x:Name="PosXBox" Grid.Column="0" Margin="0,3,5,8" TextChanged="Inspector_TextChanged"/>
+              <TextBox x:Name="PosYBox" Grid.Column="1" Margin="0,3,5,8" TextChanged="Inspector_TextChanged"/>
+              <TextBox x:Name="PosZBox" Grid.Column="2" Margin="0,3,0,8" TextChanged="Inspector_TextChanged"/>
+            </Grid>
+
+            <TextBlock Text="Rotation" FontWeight="SemiBold" Margin="0,8,0,4"/>
+            <UniformGrid Columns="3">
+              <TextBlock Text="X" Foreground="#df5959" HorizontalAlignment="Center"/>
+              <TextBlock Text="Y" Foreground="#4fb477" HorizontalAlignment="Center"/>
+              <TextBlock Text="Z" Foreground="#579de0" HorizontalAlignment="Center"/>
+            </UniformGrid>
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition/>
+                <ColumnDefinition/>
+                <ColumnDefinition/>
+              </Grid.ColumnDefinitions>
+              <TextBox x:Name="RotXBox" Grid.Column="0" Margin="0,3,5,8" TextChanged="Inspector_TextChanged"/>
+              <TextBox x:Name="RotYBox" Grid.Column="1" Margin="0,3,5,8" TextChanged="Inspector_TextChanged"/>
+              <TextBox x:Name="RotZBox" Grid.Column="2" Margin="0,3,0,8" TextChanged="Inspector_TextChanged"/>
+            </Grid>
+
+            <TextBlock Text="Scale" FontWeight="SemiBold" Margin="0,8,0,4"/>
+            <UniformGrid Columns="3">
+              <TextBlock Text="X" Foreground="#df5959" HorizontalAlignment="Center"/>
+              <TextBlock Text="Y" Foreground="#4fb477" HorizontalAlignment="Center"/>
+              <TextBlock Text="Z" Foreground="#579de0" HorizontalAlignment="Center"/>
+            </UniformGrid>
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition/>
+                <ColumnDefinition/>
+                <ColumnDefinition/>
+              </Grid.ColumnDefinitions>
+              <TextBox x:Name="ScaleXBox" Grid.Column="0" Margin="0,3,5,8" TextChanged="Inspector_TextChanged"/>
+              <TextBox x:Name="ScaleYBox" Grid.Column="1" Margin="0,3,5,8" TextChanged="Inspector_TextChanged"/>
+              <TextBox x:Name="ScaleZBox" Grid.Column="2" Margin="0,3,0,8" TextChanged="Inspector_TextChanged"/>
+            </Grid>
+
+            <StackPanel Orientation="Horizontal" Margin="0,8,0,14">
+              <Button Content="Apply" Click="ApplyInspectorButton_Click"/>
+              <Button Content="Duplicate" Click="DuplicateButton_Click"/>
+              <Button Content="Delete" Click="DeleteButton_Click"/>
+            </StackPanel>
+
+            <TextBlock Text="Component Notes" FontWeight="SemiBold" Margin="0,8,0,4"/>
+            <TextBox x:Name="ComponentNotesBox"
+                     Height="120"
+                     AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     Text="Transform, Mesh Renderer, Collider, Script Component"/>
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+
+      <Border Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Background="#1b1e24" BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="0,1,0,0">
+        <TabControl>
+          <TabItem Header="Assets">
+            <Grid Margin="10">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="190"/>
+                <ColumnDefinition Width="*"/>
+              </Grid.ColumnDefinitions>
+              <ListBox x:Name="ProjectFilesList"/>
+              <WrapPanel Grid.Column="1" Margin="10,0,0,0">
+                <Button Content="+ Object" Click="NewObjectMenuItem_Click"/>
+                <Button Content="+ Script" Click="NewScriptMenuItem_Click"/>
+                <Button Content="Save Scene" Click="SaveSceneButton_Click"/>
+                <Button Content="Refresh Files" Click="RefreshProjectFilesButton_Click"/>
+              </WrapPanel>
+            </Grid>
+          </TabItem>
+          <TabItem Header="Console">
+            <TextBox x:Name="ConsoleBox"
+                     Background="#101216"
+                     BorderThickness="0"
+                     Foreground="#dce4ee"
+                     TextWrapping="Wrap"
+                     AcceptsReturn="True"
+                     IsReadOnly="True"
+                     VerticalScrollBarVisibility="Auto"/>
+          </TabItem>
+          <TabItem Header="Tomk Script">
+            <TextBox x:Name="ScriptBox"
+                     Background="#101216"
+                     BorderThickness="0"
+                     Foreground="#e7edf5"
+                     AcceptsReturn="True"
+                     VerticalScrollBarVisibility="Auto"
+                     FontFamily="Consolas"
+                     FontSize="14"/>
+          </TabItem>
+        </TabControl>
+      </Border>
+    </Grid>
+  </DockPanel>
+</Window>

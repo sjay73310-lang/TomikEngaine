@@ -1,0 +1,13 @@
+class PlayerController : Component {
+    walkSpeed: float = 5.0;
+    runSpeed: float = 9.0;
+    mouseSensitivity: float = 0.12;
+
+    fn update(delta: float) {
+        let move = Input.axis("Horizontal", "Vertical");
+        let look = Input.mouseDelta();
+
+        entity.move(move * walkSpeed * delta);
+        entity.camera.look(look * mouseSensitivity);
+    }
+}

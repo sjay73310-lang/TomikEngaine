@@ -1,0 +1,17 @@
+{
+  "name": "Tomk Engine",
+  "version": "0.1.0",
+  "language": "Tomk Script",
+  "scriptExtension": ".tomk",
+  "defaultProject": "projects/sample-fps",
+  "modules": [
+    "core",
+    "renderer",
+    "physics",
+    "input",
+    "animation",
+    "fps",
+    "editor",
+    "scripting"
+  ]
+}

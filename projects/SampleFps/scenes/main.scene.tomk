@@ -1,0 +1,23 @@
+scene "Editor Scene" {
+    entity "Ground" {
+        type: Plane;
+        position: Vector3(0, -0.55, 0);
+        rotation: Vector3(0, 0, 0);
+        scale: Vector3(12, 1, 12);
+    }
+
+    entity "Player Cube" {
+        type: Cube;
+        position: Vector3(0, 0, 0);
+        rotation: Vector3(0, 0, 0);
+        scale: Vector3(1, 1, 1);
+    }
+
+    entity "Target Sphere" {
+        type: Sphere;
+        position: Vector3(2.2, 0.15, 0.8);
+        rotation: Vector3(0, 0, 0);
+        scale: Vector3(0.8, 0.8, 0.8);
+    }
+
+}
