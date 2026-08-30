@@ -31,6 +31,7 @@ public partial class MainWindow : Window
     private bool _isTransformDragging;
     private bool _isUpdatingInspector;
     private bool _isPlaying;
+    private bool _showGizmo = true;
     private TransformTool _activeTool = TransformTool.Select;
     private Axis? _activeAxis;
     private string _currentProjectName = "SampleFps";
@@ -142,7 +143,7 @@ class PlayerController : Component {
             GameViewport.Children.Add(new ModelVisual3D { Content = BuildModel(sceneObject, false) });
         }
 
-        if (HierarchyList.SelectedItem is SceneObject selected)
+        if (_showGizmo && HierarchyList.SelectedItem is SceneObject selected)
         {
             SceneViewport.Children.Add(new ModelVisual3D { Content = BuildGizmo(selected, _activeTool) });
         }
@@ -302,19 +303,45 @@ class PlayerController : Component {
         var length = tool == TransformTool.Scale ? 1.8 : 1.55;
         var thickness = tool == TransformTool.Rotate ? 0.045 : 0.035;
         var origin = new Point3D(sceneObject.X, sceneObject.Y, sceneObject.Z);
+        var xColor = AxisColor(Axis.X);
+        var yColor = AxisColor(Axis.Y);
+        var zColor = AxisColor(Axis.Z);
 
-        AddGizmoPart(group, BuildAxisBar(origin, Axis.X, length, thickness, Color.FromRgb(223, 89, 89)), sceneObject, Axis.X);
-        AddGizmoPart(group, BuildAxisBar(origin, Axis.Y, length, thickness, Color.FromRgb(79, 180, 119)), sceneObject, Axis.Y);
-        AddGizmoPart(group, BuildAxisBar(origin, Axis.Z, length, thickness, Color.FromRgb(87, 157, 224)), sceneObject, Axis.Z);
+        if (tool == TransformTool.Rotate)
+        {
+            AddGizmoPart(group, BuildRotationRing(origin, Axis.X, 1.25, xColor), sceneObject, Axis.X);
+            AddGizmoPart(group, BuildRotationRing(origin, Axis.Y, 1.38, yColor), sceneObject, Axis.Y);
+            AddGizmoPart(group, BuildRotationRing(origin, Axis.Z, 1.51, zColor), sceneObject, Axis.Z);
+            return group;
+        }
+
+        AddGizmoPart(group, BuildAxisBar(origin, Axis.X, length, thickness, xColor), sceneObject, Axis.X);
+        AddGizmoPart(group, BuildAxisBar(origin, Axis.Y, length, thickness, yColor), sceneObject, Axis.Y);
+        AddGizmoPart(group, BuildAxisBar(origin, Axis.Z, length, thickness, zColor), sceneObject, Axis.Z);
 
         if (tool == TransformTool.Scale)
         {
-            AddGizmoPart(group, BuildAxisHandle(origin, Axis.X, length, Color.FromRgb(223, 89, 89)), sceneObject, Axis.X);
-            AddGizmoPart(group, BuildAxisHandle(origin, Axis.Y, length, Color.FromRgb(79, 180, 119)), sceneObject, Axis.Y);
-            AddGizmoPart(group, BuildAxisHandle(origin, Axis.Z, length, Color.FromRgb(87, 157, 224)), sceneObject, Axis.Z);
+            AddGizmoPart(group, BuildAxisHandle(origin, Axis.X, length, xColor), sceneObject, Axis.X);
+            AddGizmoPart(group, BuildAxisHandle(origin, Axis.Y, length, yColor), sceneObject, Axis.Y);
+            AddGizmoPart(group, BuildAxisHandle(origin, Axis.Z, length, zColor), sceneObject, Axis.Z);
         }
 
         return group;
+    }
+
+    private Color AxisColor(Axis axis)
+    {
+        if (_activeAxis == axis)
+        {
+            return Color.FromRgb(242, 201, 76);
+        }
+
+        return axis switch
+        {
+            Axis.X => Color.FromRgb(223, 89, 89),
+            Axis.Y => Color.FromRgb(79, 180, 119),
+            _ => Color.FromRgb(87, 157, 224)
+        };
     }
 
     private void AddGizmoPart(Model3DGroup group, GeometryModel3D model, SceneObject sceneObject, Axis axis)
@@ -367,6 +394,18 @@ class PlayerController : Component {
         transform.Children.Add(new TranslateTransform3D(origin.X + offset.X, origin.Y + offset.Y, origin.Z + offset.Z));
 
         return new GeometryModel3D(MeshFactory.CreateCube(1), material)
+        {
+            BackMaterial = material,
+            Transform = transform
+        };
+    }
+
+    private static GeometryModel3D BuildRotationRing(Point3D origin, Axis axis, double radius, Color color)
+    {
+        var material = new DiffuseMaterial(new SolidColorBrush(color));
+        var transform = new TranslateTransform3D(origin.X, origin.Y, origin.Z);
+
+        return new GeometryModel3D(MeshFactory.CreateRing(radius, 0.025, axis), material)
         {
             BackMaterial = material,
             Transform = transform
@@ -473,7 +512,7 @@ class PlayerController : Component {
     private void SetActiveTool(TransformTool tool)
     {
         _activeTool = tool;
-        ToolHelpText.Text = $"Tool: {tool}  |  W/E/R tools  |  Hold RMB + WASD/QZ fly  |  Del delete";
+        ToolHelpText.Text = $"Tool: {tool}  |  Gizmo {(_showGizmo ? "On" : "Off")}  |  Hold RMB + WASD/QZ fly  |  Del delete";
         StatusText.Text = $"{tool} tool";
 
         var normal = new SolidColorBrush(Color.FromRgb(48, 54, 64));
@@ -482,6 +521,7 @@ class PlayerController : Component {
         MoveToolButton.Background = tool == TransformTool.Move ? active : normal;
         RotateToolButton.Background = tool == TransformTool.Rotate ? active : normal;
         ScaleToolButton.Background = tool == TransformTool.Scale ? active : normal;
+        GizmoToggleButton.Background = _showGizmo ? active : normal;
 
         RebuildViewports();
     }
@@ -1135,6 +1175,14 @@ class PlayerController : Component {
         SetActiveTool(TransformTool.Scale);
     }
 
+    private void GizmoToggleButton_Click(object sender, RoutedEventArgs e)
+    {
+        _showGizmo = !_showGizmo;
+        GizmoToggleButton.Content = _showGizmo ? "Gizmo On" : "Gizmo Off";
+        SetActiveTool(_activeTool);
+        Log($"Gizmo {(_showGizmo ? "enabled" : "disabled")}.");
+    }
+
     private void AddCubeButton_Click(object sender, RoutedEventArgs e)
     {
         AddObjectFromEditor(SceneObjectType.Cube);
@@ -1719,6 +1767,7 @@ class PlayerController : Component {
                 _isTransformDragging = _activeTool != TransformTool.Select;
                 SceneViewSurface.CaptureMouse();
                 StatusText.Text = $"{_activeTool} {hit.Gizmo.Axis}";
+                RebuildViewports();
             }
             else if (hit.Object is not null)
             {
@@ -1778,6 +1827,7 @@ class PlayerController : Component {
         _isPanningScene = false;
         _isTransformDragging = false;
         _activeAxis = null;
+        RebuildViewports();
         SceneViewSurface.ReleaseMouseCapture();
     }
 
@@ -2229,5 +2279,49 @@ public static class MeshFactory
         mesh.TriangleIndices.Add(start + 4);
         mesh.TriangleIndices.Add(start + 1);
         return mesh;
+    }
+
+    public static MeshGeometry3D CreateRing(double radius, double tubeRadius, Axis axis)
+    {
+        const int segments = 96;
+        var mesh = new MeshGeometry3D();
+
+        for (var index = 0; index < segments; index++)
+        {
+            var a0 = index * 2 * Math.PI / segments;
+            var a1 = (index + 1) * 2 * Math.PI / segments;
+
+            var p0 = RingPoint(a0, radius, axis);
+            var p1 = RingPoint(a1, radius, axis);
+            var p2 = RingPoint(a1, radius + tubeRadius, axis);
+            var p3 = RingPoint(a0, radius + tubeRadius, axis);
+            var start = mesh.Positions.Count;
+
+            mesh.Positions.Add(p0);
+            mesh.Positions.Add(p1);
+            mesh.Positions.Add(p2);
+            mesh.Positions.Add(p3);
+            mesh.TriangleIndices.Add(start);
+            mesh.TriangleIndices.Add(start + 1);
+            mesh.TriangleIndices.Add(start + 2);
+            mesh.TriangleIndices.Add(start);
+            mesh.TriangleIndices.Add(start + 2);
+            mesh.TriangleIndices.Add(start + 3);
+        }
+
+        return mesh;
+    }
+
+    private static Point3D RingPoint(double angle, double radius, Axis axis)
+    {
+        var a = Math.Cos(angle) * radius;
+        var b = Math.Sin(angle) * radius;
+
+        return axis switch
+        {
+            Axis.X => new Point3D(0, a, b),
+            Axis.Y => new Point3D(a, 0, b),
+            _ => new Point3D(a, b, 0)
+        };
     }
 }

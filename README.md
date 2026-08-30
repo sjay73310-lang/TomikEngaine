@@ -72,6 +72,11 @@ It includes:
 - Window layout supports resizable panels with splitters.
 - Hierarchy, Inspector, Asset Browser, Console, and Tomk Script panels can float in separate movable/resizable windows.
 - Window menu can save a personal layout, load it again, or reset the editor layout.
+- Visual theme has a darker editor palette for menus, asset browser, controls, and floating panels.
+- Asset Browser has a resizable tree and preview/details area.
+- Gizmo can be toggled on/off from the top toolbar.
+- Active gizmo axis highlights yellow while dragging.
+- Rotate tool shows XYZ ring gizmos instead of straight move handles.
 - Project shader files are saved under `projects/<ProjectName>/assets/shaders`.
 - Project material files are saved under `projects/<ProjectName>/assets/materials`.
 - Materials can choose a shader and can be assigned to selected objects.

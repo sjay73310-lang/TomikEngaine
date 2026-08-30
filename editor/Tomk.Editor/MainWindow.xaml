@@ -69,6 +69,7 @@
           <Button x:Name="MoveToolButton" Content="Move" Click="MoveToolButton_Click"/>
           <Button x:Name="RotateToolButton" Content="Rotate" Click="RotateToolButton_Click"/>
           <Button x:Name="ScaleToolButton" Content="Scale" Click="ScaleToolButton_Click"/>
+          <Button x:Name="GizmoToggleButton" Content="Gizmo On" Click="GizmoToggleButton_Click"/>
           <Button x:Name="PlayButton" Content="Play" Click="PlayButton_Click"/>
           <Button x:Name="PauseButton" Content="Pause" Click="PauseButton_Click"/>
           <Button Content="Save Scene" Click="SaveSceneButton_Click"/>
@@ -118,7 +119,7 @@
       <GridSplitter Grid.Row="0" Grid.Column="1" Width="5" HorizontalAlignment="Stretch" Background="#303640"/>
 
       <Border Grid.Row="0" Grid.Column="2" Background="#111318" BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="0,0,1,1">
-        <TabControl x:Name="ViewTabs">
+        <TabControl x:Name="ViewTabs" Background="#0f1419">
           <TabItem Header="Scene View">
             <Grid x:Name="SceneViewSurface"
                   Background="#111318"
@@ -134,7 +135,7 @@
               <Border Background="#aa15171b" BorderBrush="#3c424d" BorderThickness="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12" Padding="10,6">
                 <StackPanel>
                   <TextBlock x:Name="SceneHelpText" Text="Scene View  |  Left click: select/gizmo  |  Right drag: orbit  |  Middle drag: pan  |  Wheel: zoom" Foreground="#dce4ee"/>
-                  <TextBlock x:Name="ToolHelpText" Text="Tool: Select  |  W/E/R tools  |  WASD/QZ camera  |  Del delete" Foreground="#aeb6c2" Margin="0,3,0,0"/>
+                  <TextBlock x:Name="ToolHelpText" Text="Tool: Select  |  Gizmo On  |  W/E/R tools  |  WASD/QZ camera  |  Del delete" Foreground="#aeb6c2" Margin="0,3,0,0"/>
                 </StackPanel>
               </Border>
             </Grid>
@@ -279,11 +280,12 @@
                 <RowDefinition Height="*"/>
               </Grid.RowDefinitions>
               <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="260"/>
+                <ColumnDefinition x:Name="AssetTreeColumn" Width="300" MinWidth="180"/>
+                <ColumnDefinition Width="5"/>
                 <ColumnDefinition Width="*"/>
               </Grid.ColumnDefinitions>
 
-              <DockPanel Grid.ColumnSpan="2" LastChildFill="True">
+              <DockPanel Grid.ColumnSpan="3" LastChildFill="True">
                 <TextBox x:Name="AssetSearchBox"
                          Width="240"
                          DockPanel.Dock="Left"
@@ -337,7 +339,9 @@
                 </TreeView.ContextMenu>
               </TreeView>
 
-              <DockPanel Grid.Row="1" Grid.Column="1" Margin="10,0,0,0">
+              <GridSplitter Grid.Row="1" Grid.Column="1" Width="5" HorizontalAlignment="Stretch" Background="#303b49"/>
+
+              <DockPanel Grid.Row="1" Grid.Column="2" Margin="10,0,0,0">
                 <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                   <Button Content="Import Model" Click="ImportModelMenuItem_Click"/>
                   <Button Content="Import Texture" Click="ImportTextureMenuItem_Click"/>
