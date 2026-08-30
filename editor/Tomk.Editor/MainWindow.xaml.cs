@@ -1897,7 +1897,7 @@ class PlayerController : Component {
         ViewTabs.SelectedIndex = 1;
         GameOverlayText.Text = "Game View running";
         StatusText.Text = "Play mode";
-        Log("Play mode started.");
+        Log("Play mode started. Objects only animate when they have a runtime/preview component.");
     }
 
     private void PauseButton_Click(object sender, RoutedEventArgs e)
@@ -2130,7 +2130,7 @@ class PlayerController : Component {
             return;
         }
 
-        foreach (var sceneObject in _sceneObjects.Where(item => item.Type != SceneObjectType.Plane))
+        foreach (var sceneObject in _sceneObjects.Where(item => item.Components.Contains("Preview Spin")))
         {
             sceneObject.RotationY = (sceneObject.RotationY + 0.6) % 360;
         }

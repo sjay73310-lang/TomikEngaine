@@ -10,6 +10,11 @@
     <SolidColorBrush x:Key="MutedTextBrush" Color="#aeb6c2"/>
     <SolidColorBrush x:Key="AccentBrush" Color="#38c98b"/>
     <SolidColorBrush x:Key="HotBrush" Color="#f2c94c"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#11161c"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#1b2027"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="#eef2f7"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#38c98b"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#07100c"/>
 
     <Style TargetType="Window">
       <Setter Property="Background" Value="#0f1419"/>
@@ -51,6 +56,29 @@
       <Setter Property="Background" Value="#202935"/>
       <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
       <Setter Property="Padding" Value="12,6"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="TabItem">
+            <Border x:Name="TabBorder"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="#394554"
+                    BorderThickness="1"
+                    Padding="{TemplateBinding Padding}"
+                    Margin="0,0,2,0">
+              <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsSelected" Value="True">
+                <Setter TargetName="TabBorder" Property="Background" Value="#263746"/>
+                <Setter Property="Foreground" Value="#ffffff"/>
+              </Trigger>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="TabBorder" Property="Background" Value="#2f3b49"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
 
     <Style TargetType="Menu">
@@ -74,6 +102,24 @@
       <Setter Property="Background" Value="{StaticResource ControlBrush}"/>
       <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
       <Setter Property="BorderBrush" Value="#425166"/>
+    </Style>
+
+    <Style TargetType="ComboBoxItem">
+      <Setter Property="Background" Value="#151b22"/>
+      <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+      <Setter Property="Padding" Value="8,4"/>
+    </Style>
+
+    <Style TargetType="ListBoxItem">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+      <Setter Property="Padding" Value="4,2"/>
+      <Style.Triggers>
+        <Trigger Property="IsSelected" Value="True">
+          <Setter Property="Background" Value="#2d5f7d"/>
+          <Setter Property="Foreground" Value="#ffffff"/>
+        </Trigger>
+      </Style.Triggers>
     </Style>
 
     <Style TargetType="TreeView">

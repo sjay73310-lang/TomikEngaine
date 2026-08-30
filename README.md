@@ -73,6 +73,7 @@ It includes:
 - Asset Browser tree/tiles/preview areas are resizable for small or zoomed-out windows.
 - Inspector is organized into Object, Components, Render, and Lighting tabs.
 - Components tab supports Add Component, Remove Component, and Attach Script.
+- Play mode no longer rotates every object automatically; only objects with the `Preview Spin` component rotate during preview.
 - Camera tab supports Camera enabled state, Field Of View, Near Clip, Far Clip, Aspect Ratio, and frustum visibility.
 - Selecting a camera shows a yellow camera frustum in the Scene View so you can see what the camera renders.
 - Game View now uses the selected hierarchy camera object's rotation, FOV, near clip, and far clip.
@@ -84,6 +85,7 @@ It includes:
 - Hierarchy, Inspector, Asset Browser, Console, and Tomk Script panels can float in separate movable/resizable windows.
 - Window menu can save a personal layout, load it again, or reset the editor layout.
 - Visual theme has a darker editor palette for menus, asset browser, controls, and floating panels.
+- Selected tabs, combo boxes, menus, lists, and popups use dark editor styling instead of default white WPF styling.
 - Asset Browser has a resizable tree and preview/details area.
 - Gizmo can be toggled on/off from the top toolbar.
 - Active gizmo axis highlights yellow while dragging.
