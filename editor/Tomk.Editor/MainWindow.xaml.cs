@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -17,6 +18,7 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<SceneObject> _sceneObjects = new();
     private readonly ObservableCollection<ShaderAsset> _shaders = new();
     private readonly ObservableCollection<MaterialAsset> _materials = new();
+    private readonly Dictionary<string, FloatingPanelState> _floatingPanels = new();
     private readonly Dictionary<Model3D, SceneObject> _modelToObject = new();
     private readonly Dictionary<Model3D, GizmoHit> _gizmoHits = new();
     private readonly DispatcherTimer _playTimer = new();
@@ -36,6 +38,7 @@ public partial class MainWindow : Window
     private double _cameraPitch = 24;
     private double _cameraDistance = 8;
     private int _objectCounter = 1;
+    private bool _isRestoringLayout;
 
     public MainWindow()
     {
@@ -730,6 +733,11 @@ class PlayerController : Component {
 
     private void RefreshProjectFiles()
     {
+        if (AssetTree is null)
+        {
+            return;
+        }
+
         AssetTree.Items.Clear();
         var projectPath = CurrentProjectPath();
         if (!Directory.Exists(projectPath))
@@ -846,6 +854,245 @@ class PlayerController : Component {
     {
         ConsoleBox.AppendText($"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}");
         ConsoleBox.ScrollToEnd();
+    }
+
+    private void DetachHierarchyMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        DetachGridPanel("Hierarchy", "Hierarchy", HierarchyPanelHost, 330, 560);
+    }
+
+    private void DetachInspectorMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        DetachGridPanel("Inspector", "Inspector", InspectorPanelHost, 380, 680);
+    }
+
+    private void DetachAssetsMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        DetachTabPanel("Assets", "Asset Browser", AssetBrowserRoot, AssetsTab, 820, 440);
+    }
+
+    private void DetachConsoleMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        DetachTabPanel("Console", "Console", ConsoleBox, ConsoleTab, 760, 300);
+    }
+
+    private void DetachScriptMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        DetachTabPanel("TomkScript", "Tomk Script", ScriptBox, ScriptTab, 760, 420);
+    }
+
+    private void DetachGridPanel(string key, string title, FrameworkElement panel, double width, double height)
+    {
+        if (_floatingPanels.ContainsKey(key))
+        {
+            _floatingPanels[key].Window.Activate();
+            return;
+        }
+
+        var state = FloatingPanelState.ForGrid(key, title, panel, WorkspaceGrid);
+        WorkspaceGrid.Children.Remove(panel);
+        OpenFloatingPanel(state, width, height);
+    }
+
+    private void DetachTabPanel(string key, string title, FrameworkElement content, TabItem tab, double width, double height)
+    {
+        if (_floatingPanels.ContainsKey(key))
+        {
+            _floatingPanels[key].Window.Activate();
+            return;
+        }
+
+        var state = FloatingPanelState.ForTab(key, title, content, tab);
+        tab.Content = CreateDetachedPlaceholder(title);
+        OpenFloatingPanel(state, width, height);
+    }
+
+    private void OpenFloatingPanel(FloatingPanelState state, double width, double height)
+    {
+        var window = new Window
+        {
+            Title = $"Tomk Engine - {state.Title}",
+            Width = width,
+            Height = height,
+            MinWidth = 260,
+            MinHeight = 180,
+            Owner = this,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Background = Background,
+            Foreground = Foreground,
+            Content = state.Element
+        };
+
+        state.Window = window;
+        state.ClosedHandler = (_, _) =>
+        {
+            if (!_isRestoringLayout)
+            {
+                RestoreFloatingPanel(state.Key);
+            }
+        };
+
+        window.Closed += state.ClosedHandler;
+        _floatingPanels[state.Key] = state;
+        window.Show();
+        Log($"Detached panel: {state.Title}");
+    }
+
+    private void RestoreFloatingPanel(string key)
+    {
+        if (!_floatingPanels.TryGetValue(key, out var state))
+        {
+            return;
+        }
+
+        _isRestoringLayout = true;
+        state.Window.Closed -= state.ClosedHandler;
+        state.Window.Content = null;
+
+        if (state.DockKind == FloatingPanelDockKind.Grid)
+        {
+            Grid.SetRow(state.Element, state.Row);
+            Grid.SetColumn(state.Element, state.Column);
+            Grid.SetRowSpan(state.Element, state.RowSpan);
+            Grid.SetColumnSpan(state.Element, state.ColumnSpan);
+            if (!WorkspaceGrid.Children.Contains(state.Element))
+            {
+                WorkspaceGrid.Children.Add(state.Element);
+            }
+        }
+        else if (state.Tab is not null)
+        {
+            state.Tab.Content = state.Element;
+        }
+
+        if (state.Window.IsVisible)
+        {
+            state.Window.Close();
+        }
+
+        _floatingPanels.Remove(key);
+        _isRestoringLayout = false;
+    }
+
+    private static Border CreateDetachedPlaceholder(string title)
+    {
+        return new Border
+        {
+            Background = new SolidColorBrush(Color.FromRgb(16, 18, 22)),
+            Child = new TextBlock
+            {
+                Text = $"{title} is floating in a separate window.",
+                Foreground = new SolidColorBrush(Color.FromRgb(174, 182, 194)),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            }
+        };
+    }
+
+    private void SaveLayoutMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        CreateProjectStructure(ProjectNameBox.Text);
+        var layout = new SavedEditorLayout
+        {
+            WindowWidth = Width,
+            WindowHeight = Height,
+            WindowLeft = Left,
+            WindowTop = Top,
+            HierarchyWidth = HierarchyColumn.ActualWidth,
+            InspectorWidth = InspectorColumn.ActualWidth,
+            BottomHeight = BottomRow.ActualHeight,
+            DetachedPanels = _floatingPanels.Keys.OrderBy(key => key).ToList()
+        };
+
+        var layoutPath = LayoutFilePath();
+        File.WriteAllText(layoutPath, JsonSerializer.Serialize(layout, new JsonSerializerOptions { WriteIndented = true }));
+        RefreshProjectFiles();
+        Log($"Saved personal layout: {layoutPath}");
+    }
+
+    private void LoadLayoutMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        var layoutPath = LayoutFilePath();
+        if (!File.Exists(layoutPath))
+        {
+            Log("No saved personal layout found.");
+            return;
+        }
+
+        var layout = JsonSerializer.Deserialize<SavedEditorLayout>(File.ReadAllText(layoutPath));
+        if (layout is null)
+        {
+            return;
+        }
+
+        ResetLayout(restoreWindowSize: false);
+        Width = Math.Max(1060, layout.WindowWidth);
+        Height = Math.Max(680, layout.WindowHeight);
+        Left = layout.WindowLeft;
+        Top = layout.WindowTop;
+        HierarchyColumn.Width = new GridLength(Math.Max(160, layout.HierarchyWidth));
+        InspectorColumn.Width = new GridLength(Math.Max(220, layout.InspectorWidth));
+        BottomRow.Height = new GridLength(Math.Max(120, layout.BottomHeight));
+
+        foreach (var panel in layout.DetachedPanels)
+        {
+            DetachPanelByKey(panel);
+        }
+
+        Log("Loaded personal layout.");
+    }
+
+    private void ResetLayoutMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        ResetLayout(restoreWindowSize: true);
+        Log("Window layout reset.");
+    }
+
+    private void ResetLayout(bool restoreWindowSize)
+    {
+        foreach (var key in _floatingPanels.Keys.ToList())
+        {
+            RestoreFloatingPanel(key);
+        }
+
+        HierarchyColumn.Width = new GridLength(250);
+        InspectorColumn.Width = new GridLength(320);
+        BottomRow.Height = new GridLength(220);
+
+        if (restoreWindowSize)
+        {
+            WindowState = WindowState.Normal;
+            Width = 1360;
+            Height = 820;
+            WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        }
+    }
+
+    private void DetachPanelByKey(string key)
+    {
+        switch (key)
+        {
+            case "Hierarchy":
+                DetachGridPanel("Hierarchy", "Hierarchy", HierarchyPanelHost, 330, 560);
+                break;
+            case "Inspector":
+                DetachGridPanel("Inspector", "Inspector", InspectorPanelHost, 380, 680);
+                break;
+            case "Assets":
+                DetachTabPanel("Assets", "Asset Browser", AssetBrowserRoot, AssetsTab, 820, 440);
+                break;
+            case "Console":
+                DetachTabPanel("Console", "Console", ConsoleBox, ConsoleTab, 760, 300);
+                break;
+            case "TomkScript":
+                DetachTabPanel("TomkScript", "Tomk Script", ScriptBox, ScriptTab, 760, 420);
+                break;
+        }
+    }
+
+    private string LayoutFilePath()
+    {
+        return Path.Combine(CurrentProjectPath(), "editor-layout.tomklayout");
     }
 
     private void HierarchyList_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1034,6 +1281,11 @@ class PlayerController : Component {
 
     private void AssetSearchBox_TextChanged(object sender, TextChangedEventArgs e)
     {
+        if (AssetTree is null)
+        {
+            return;
+        }
+
         RefreshProjectFiles();
     }
 
@@ -1779,6 +2031,66 @@ public sealed record AssetCategory(string Name, string RelativePath, string Icon
         new("Audio", Path.Combine("assets", "audio"), "[Audio]"),
         new("Imports", Path.Combine("assets", "imports"), "[Imports]")
     ];
+}
+
+public enum FloatingPanelDockKind
+{
+    Grid,
+    Tab
+}
+
+public sealed class FloatingPanelState
+{
+    public required string Key { get; init; }
+    public required string Title { get; init; }
+    public required FrameworkElement Element { get; init; }
+    public required FloatingPanelDockKind DockKind { get; init; }
+    public Window Window { get; set; } = null!;
+    public EventHandler ClosedHandler { get; set; } = null!;
+    public int Row { get; init; }
+    public int Column { get; init; }
+    public int RowSpan { get; init; }
+    public int ColumnSpan { get; init; }
+    public TabItem? Tab { get; init; }
+
+    public static FloatingPanelState ForGrid(string key, string title, FrameworkElement element, Grid grid)
+    {
+        return new FloatingPanelState
+        {
+            Key = key,
+            Title = title,
+            Element = element,
+            DockKind = FloatingPanelDockKind.Grid,
+            Row = Grid.GetRow(element),
+            Column = Grid.GetColumn(element),
+            RowSpan = Math.Max(1, Grid.GetRowSpan(element)),
+            ColumnSpan = Math.Max(1, Grid.GetColumnSpan(element))
+        };
+    }
+
+    public static FloatingPanelState ForTab(string key, string title, FrameworkElement element, TabItem tab)
+    {
+        return new FloatingPanelState
+        {
+            Key = key,
+            Title = title,
+            Element = element,
+            DockKind = FloatingPanelDockKind.Tab,
+            Tab = tab
+        };
+    }
+}
+
+public sealed class SavedEditorLayout
+{
+    public double WindowWidth { get; set; } = 1360;
+    public double WindowHeight { get; set; } = 820;
+    public double WindowLeft { get; set; } = 80;
+    public double WindowTop { get; set; } = 80;
+    public double HierarchyWidth { get; set; } = 250;
+    public double InspectorWidth { get; set; } = 320;
+    public double BottomHeight { get; set; } = 220;
+    public List<string> DetachedPanels { get; set; } = new();
 }
 
 public static class SceneSerializer

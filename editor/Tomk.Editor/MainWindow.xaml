@@ -32,6 +32,17 @@
         <MenuItem Header="Frame Selected" Click="FrameSelectedMenuItem_Click"/>
         <MenuItem Header="Reset Camera" Click="ResetCameraMenuItem_Click"/>
       </MenuItem>
+      <MenuItem Header="_Window">
+        <MenuItem Header="Detach Hierarchy" Click="DetachHierarchyMenuItem_Click"/>
+        <MenuItem Header="Detach Inspector" Click="DetachInspectorMenuItem_Click"/>
+        <MenuItem Header="Detach Asset Browser" Click="DetachAssetsMenuItem_Click"/>
+        <MenuItem Header="Detach Console" Click="DetachConsoleMenuItem_Click"/>
+        <MenuItem Header="Detach Tomk Script" Click="DetachScriptMenuItem_Click"/>
+        <Separator/>
+        <MenuItem Header="Save Personal Layout" Click="SaveLayoutMenuItem_Click"/>
+        <MenuItem Header="Load Personal Layout" Click="LoadLayoutMenuItem_Click"/>
+        <MenuItem Header="Reset Window Layout" Click="ResetLayoutMenuItem_Click"/>
+      </MenuItem>
       <MenuItem Header="_GameObject">
         <MenuItem Header="Camera" Click="AddCameraMenuItem_Click"/>
         <MenuItem Header="Directional Light" Click="AddDirectionalLightMenuItem_Click"/>
@@ -72,20 +83,26 @@
       </Grid>
     </Border>
 
-    <Grid>
+    <Grid x:Name="WorkspaceGrid">
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="250"/>
+        <ColumnDefinition x:Name="HierarchyColumn" Width="250" MinWidth="160"/>
+        <ColumnDefinition Width="5"/>
         <ColumnDefinition Width="*"/>
-        <ColumnDefinition Width="320"/>
+        <ColumnDefinition Width="5"/>
+        <ColumnDefinition x:Name="InspectorColumn" Width="320" MinWidth="220"/>
       </Grid.ColumnDefinitions>
       <Grid.RowDefinitions>
         <RowDefinition Height="*"/>
-        <RowDefinition Height="170"/>
+        <RowDefinition Height="5"/>
+        <RowDefinition x:Name="BottomRow" Height="220" MinHeight="120"/>
       </Grid.RowDefinitions>
 
-      <Border Grid.Row="0" Grid.Column="0" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="0,0,1,1">
+      <Border x:Name="HierarchyPanelHost" Grid.Row="0" Grid.Column="0" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="0,0,1,1">
         <DockPanel Margin="10">
-          <TextBlock DockPanel.Dock="Top" Text="Hierarchy" FontWeight="SemiBold" FontSize="15" Margin="0,0,0,8"/>
+          <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <Button Content="Float" DockPanel.Dock="Right" Padding="7,3" Click="DetachHierarchyMenuItem_Click"/>
+            <TextBlock Text="Hierarchy" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center"/>
+          </DockPanel>
           <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,8,0,0">
             <Button Content="+ Cube" Click="AddCubeButton_Click"/>
             <Button Content="+ Sphere" Click="AddSphereButton_Click"/>
@@ -98,7 +115,9 @@
         </DockPanel>
       </Border>
 
-      <Border Grid.Row="0" Grid.Column="1" Background="#111318" BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="0,0,1,1">
+      <GridSplitter Grid.Row="0" Grid.Column="1" Width="5" HorizontalAlignment="Stretch" Background="#303640"/>
+
+      <Border Grid.Row="0" Grid.Column="2" Background="#111318" BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="0,0,1,1">
         <TabControl x:Name="ViewTabs">
           <TabItem Header="Scene View">
             <Grid x:Name="SceneViewSurface"
@@ -131,10 +150,15 @@
         </TabControl>
       </Border>
 
-      <Border Grid.Row="0" Grid.Column="2" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="0,0,0,1">
+      <GridSplitter Grid.Row="0" Grid.Column="3" Width="5" HorizontalAlignment="Stretch" Background="#303640"/>
+
+      <Border x:Name="InspectorPanelHost" Grid.Row="0" Grid.Column="4" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="0,0,0,1">
         <ScrollViewer VerticalScrollBarVisibility="Auto">
           <StackPanel Margin="12">
-            <TextBlock Text="Inspector" FontWeight="SemiBold" FontSize="15" Margin="0,0,0,10"/>
+            <DockPanel Margin="0,0,0,10">
+              <Button Content="Float" DockPanel.Dock="Right" Padding="7,3" Click="DetachInspectorMenuItem_Click"/>
+              <TextBlock Text="Inspector" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center"/>
+            </DockPanel>
 
             <TextBlock Text="Name" Foreground="{StaticResource MutedTextBrush}"/>
             <TextBox x:Name="NameBox" TextChanged="Inspector_TextChanged"/>
@@ -244,10 +268,12 @@
         </ScrollViewer>
       </Border>
 
-      <Border Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Background="#1b1e24" BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="0,1,0,0">
-        <TabControl>
-          <TabItem Header="Assets">
-            <Grid Margin="10">
+      <GridSplitter Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="5" Height="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="#303640"/>
+
+      <Border x:Name="BottomPanelHost" Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="5" Background="#1b1e24" BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="0,1,0,0">
+        <TabControl x:Name="BottomTabs">
+          <TabItem x:Name="AssetsTab" Header="Assets">
+            <Grid x:Name="AssetBrowserRoot" Margin="10">
               <Grid.RowDefinitions>
                 <RowDefinition Height="34"/>
                 <RowDefinition Height="*"/>
@@ -333,7 +359,7 @@
               </DockPanel>
             </Grid>
           </TabItem>
-          <TabItem Header="Console">
+          <TabItem x:Name="ConsoleTab" Header="Console">
             <TextBox x:Name="ConsoleBox"
                      Background="#101216"
                      BorderThickness="0"
@@ -343,7 +369,7 @@
                      IsReadOnly="True"
                      VerticalScrollBarVisibility="Auto"/>
           </TabItem>
-          <TabItem Header="Tomk Script">
+          <TabItem x:Name="ScriptTab" Header="Tomk Script">
             <TextBox x:Name="ScriptBox"
                      Background="#101216"
                      BorderThickness="0"

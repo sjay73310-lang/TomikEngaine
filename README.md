@@ -69,6 +69,9 @@ It includes:
 - Asset Browser works like a project file explorer with category folders, search, preview, drag-drop, and right-click actions.
 - Asset categories include Models, Materials, Shaders, Textures, Scripts, Scenes, Objects, Audio, and Imports.
 - Right-click assets to add supported models/objects to the scene, import model/texture files, create shaders/materials/scripts/object files, reveal in Explorer, or refresh.
+- Window layout supports resizable panels with splitters.
+- Hierarchy, Inspector, Asset Browser, Console, and Tomk Script panels can float in separate movable/resizable windows.
+- Window menu can save a personal layout, load it again, or reset the editor layout.
 - Project shader files are saved under `projects/<ProjectName>/assets/shaders`.
 - Project material files are saved under `projects/<ProjectName>/assets/materials`.
 - Materials can choose a shader and can be assigned to selected objects.
