@@ -2,6 +2,8 @@
 
 Tomk Engine is a concept base for a 3D game engine with a real-time editor, FPS tooling, rig/animation workflow, and a custom C#-like scripting language called Tomk Script.
 
+GitHub repository name: `TomikEngaine`.
+
 ## Goal
 
 - Create and edit 3D scenes inside an editor viewport.
