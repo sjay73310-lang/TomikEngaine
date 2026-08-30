@@ -1,0 +1,6 @@
+sky "Main Sky" {
+    mode: Classic;
+    skyColor: "#FF4F86C6";
+    horizonColor: "#FFD7EDF5";
+    cloudDensity: 0.45;
+}

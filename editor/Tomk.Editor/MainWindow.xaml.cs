@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Windows;
@@ -7,6 +8,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
 using System.Windows.Threading;
+using Microsoft.Win32;
 
 namespace Tomk.Editor;
 
@@ -42,6 +44,7 @@ public partial class MainWindow : Window
         HierarchyList.ItemsSource = _sceneObjects;
         ObjectMaterialBox.ItemsSource = _materials;
         MaterialShaderBox.ItemsSource = _shaders;
+        AssetCategoryBox.SelectedIndex = 0;
         ScriptBox.Text = """
 class PlayerController : Component {
     walkSpeed: float = 5.0;
@@ -696,6 +699,8 @@ class PlayerController : Component {
         Directory.CreateDirectory(Path.Combine(projectPath, "assets", "materials"));
         Directory.CreateDirectory(Path.Combine(projectPath, "assets", "shaders"));
         Directory.CreateDirectory(Path.Combine(projectPath, "assets", "textures"));
+        Directory.CreateDirectory(Path.Combine(projectPath, "assets", "audio"));
+        Directory.CreateDirectory(Path.Combine(projectPath, "assets", "imports"));
         Directory.CreateDirectory(Path.Combine(projectPath, "objects"));
         Directory.CreateDirectory(Path.Combine(projectPath, "scenes"));
         Directory.CreateDirectory(Path.Combine(projectPath, "scripts"));
@@ -725,17 +730,103 @@ class PlayerController : Component {
 
     private void RefreshProjectFiles()
     {
-        ProjectFilesList.Items.Clear();
+        AssetTree.Items.Clear();
         var projectPath = CurrentProjectPath();
         if (!Directory.Exists(projectPath))
         {
             return;
         }
 
-        foreach (var file in Directory.GetFiles(projectPath, "*", SearchOption.AllDirectories).OrderBy(file => file))
+        var search = AssetSearchBox?.Text?.Trim() ?? "";
+        var category = SelectedAssetCategory();
+        var categories = AssetCategory.All.Where(item => category == "All" || item.Name == category);
+
+        foreach (var assetCategory in categories)
         {
-            ProjectFilesList.Items.Add(Path.GetRelativePath(projectPath, file));
+            var folderPath = Path.Combine(projectPath, assetCategory.RelativePath);
+            Directory.CreateDirectory(folderPath);
+
+            var root = new TreeViewItem
+            {
+                Header = $"{assetCategory.Icon} {assetCategory.Name}",
+                IsExpanded = category != "All",
+                Tag = new AssetBrowserNode(assetCategory.Name, folderPath, assetCategory.RelativePath, true, assetCategory.Name)
+            };
+
+            AddAssetFolderChildren(root, folderPath, projectPath, assetCategory.Name, search);
+            if (root.Items.Count > 0 || string.IsNullOrWhiteSpace(search))
+            {
+                AssetTree.Items.Add(root);
+            }
         }
+
+        AssetPathText.Text = $"{_currentProjectName} / {category}";
+    }
+
+    private void AddAssetFolderChildren(TreeViewItem parent, string folderPath, string projectPath, string category, string search)
+    {
+        foreach (var directory in Directory.GetDirectories(folderPath).OrderBy(Path.GetFileName))
+        {
+            var relativePath = Path.GetRelativePath(projectPath, directory);
+            var child = new TreeViewItem
+            {
+                Header = $"[Folder] {Path.GetFileName(directory)}",
+                IsExpanded = !string.IsNullOrWhiteSpace(search),
+                Tag = new AssetBrowserNode(Path.GetFileName(directory), directory, relativePath, true, category)
+            };
+
+            AddAssetFolderChildren(child, directory, projectPath, category, search);
+            if (child.Items.Count > 0 || string.IsNullOrWhiteSpace(search) || Path.GetFileName(directory).Contains(search, StringComparison.OrdinalIgnoreCase))
+            {
+                parent.Items.Add(child);
+            }
+        }
+
+        foreach (var file in Directory.GetFiles(folderPath).OrderBy(Path.GetFileName))
+        {
+            var fileName = Path.GetFileName(file);
+            var relativePath = Path.GetRelativePath(projectPath, file);
+            if (!string.IsNullOrWhiteSpace(search) &&
+                !fileName.Contains(search, StringComparison.OrdinalIgnoreCase) &&
+                !relativePath.Contains(search, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            parent.Items.Add(new TreeViewItem
+            {
+                Header = $"{AssetIconFor(file)} {fileName}",
+                Tag = new AssetBrowserNode(fileName, file, relativePath, false, category)
+            });
+        }
+    }
+
+    private string SelectedAssetCategory()
+    {
+        return AssetCategoryBox?.SelectedItem is ComboBoxItem item && item.Content is string value ? value : "All";
+    }
+
+    private static string AssetIconFor(string file)
+    {
+        return Path.GetExtension(file).ToLowerInvariant() switch
+        {
+            ".tomkshader" => "[Shader]",
+            ".tomkmat" => "[Mat]",
+            ".tomk" => "[Script]",
+            ".tomkobj" => "[Object]",
+            ".tomkproject" => "[Project]",
+            ".tomksky" => "[Sky]",
+            ".scene" or ".tomkscene" => "[Scene]",
+            ".glb" or ".gltf" or ".fbx" or ".obj" => "[Model]",
+            ".png" or ".jpg" or ".jpeg" or ".tga" or ".bmp" => "[Tex]",
+            ".wav" or ".mp3" or ".ogg" => "[Audio]",
+            _ => "[File]"
+        };
+    }
+
+    private AssetBrowserNode? SelectedAssetNode()
+    {
+        return AssetTree.SelectedItem is TreeViewItem item ? item.Tag as AssetBrowserNode : null;
     }
 
     private static string SanitizeProjectName(string projectName)
@@ -939,6 +1030,214 @@ class PlayerController : Component {
         CreateProjectStructure(ProjectNameBox.Text);
         RefreshProjectFiles();
         Log("Project files refreshed.");
+    }
+
+    private void AssetSearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        RefreshProjectFiles();
+    }
+
+    private void AssetCategoryBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (AssetTree is not null)
+        {
+            RefreshProjectFiles();
+        }
+    }
+
+    private void AssetTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+    {
+        var node = SelectedAssetNode();
+        if (node is null)
+        {
+            return;
+        }
+
+        AssetPreviewTitle.Text = node.Name;
+        AssetPreviewKind.Text = node.IsDirectory ? $"{node.Category} Folder" : $"{node.Category} Asset";
+        AssetPreviewPath.Text = node.RelativePath;
+    }
+
+    private void AssetTree_DragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void AssetTree_Drop(object sender, DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(DataFormats.FileDrop))
+        {
+            return;
+        }
+
+        ImportFilesToProject((string[])e.Data.GetData(DataFormats.FileDrop), addModelsToScene: false);
+        e.Handled = true;
+    }
+
+    private void ImportModelMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Import 3D Model",
+            Filter = "3D Models (*.glb;*.gltf;*.fbx;*.obj)|*.glb;*.gltf;*.fbx;*.obj|All files (*.*)|*.*",
+            Multiselect = true
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            ImportFilesToProject(dialog.FileNames, addModelsToScene: true);
+        }
+    }
+
+    private void ImportTextureMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Import Texture",
+            Filter = "Textures (*.png;*.jpg;*.jpeg;*.tga;*.bmp)|*.png;*.jpg;*.jpeg;*.tga;*.bmp|All files (*.*)|*.*",
+            Multiselect = true
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            ImportFilesToProject(dialog.FileNames, addModelsToScene: false);
+        }
+    }
+
+    private void AddSelectedAssetToSceneMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        var node = SelectedAssetNode();
+        if (node is null || node.IsDirectory)
+        {
+            return;
+        }
+
+        var extension = Path.GetExtension(node.FullPath).ToLowerInvariant();
+        if (IsModelExtension(extension) || extension == ".tomkobj")
+        {
+            AddImportedAssetToScene(node.FullPath);
+            Log($"Added asset to scene: {node.Name}");
+            return;
+        }
+
+        if (extension == ".tomkmat" && HierarchyList.SelectedItem is SceneObject selected)
+        {
+            selected.MaterialName = Path.GetFileNameWithoutExtension(node.FullPath);
+            FillInspector(selected);
+            RebuildViewports();
+            Log($"Applied material asset to {selected.Name}: {selected.MaterialName}");
+        }
+    }
+
+    private void CreateAssetFolderMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        CreateProjectStructure(ProjectNameBox.Text);
+        var node = SelectedAssetNode();
+        var basePath = node?.IsDirectory == true ? node.FullPath : CategoryPathFor(SelectedAssetCategory());
+        var folderPath = Path.Combine(basePath, $"NewFolder_{DateTime.Now:HHmmss}");
+        Directory.CreateDirectory(folderPath);
+        RefreshProjectFiles();
+        Log($"Created folder: {folderPath}");
+    }
+
+    private void RevealAssetMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        var node = SelectedAssetNode();
+        var path = node?.FullPath ?? CurrentProjectPath();
+        var target = Directory.Exists(path) ? path : Path.GetDirectoryName(path)!;
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = "explorer.exe",
+            Arguments = $"\"{target}\"",
+            UseShellExecute = true
+        });
+    }
+
+    private void ImportFilesToProject(IEnumerable<string> files, bool addModelsToScene)
+    {
+        CreateProjectStructure(ProjectNameBox.Text);
+        var importedCount = 0;
+
+        foreach (var file in files.Where(File.Exists))
+        {
+            var extension = Path.GetExtension(file).ToLowerInvariant();
+            var folder = CategoryPathFor(CategoryNameForExtension(extension));
+            Directory.CreateDirectory(folder);
+
+            var destination = UniqueDestinationPath(Path.Combine(folder, Path.GetFileName(file)));
+            File.Copy(file, destination, true);
+            importedCount++;
+
+            if (addModelsToScene && (IsModelExtension(extension) || extension == ".tomkobj"))
+            {
+                AddImportedAssetToScene(destination);
+            }
+
+            Log($"Imported {Path.GetFileName(file)} -> {Path.GetRelativePath(CurrentProjectPath(), destination)}");
+        }
+
+        RefreshProjectFiles();
+        RebuildViewports();
+        StatusText.Text = importedCount > 0 ? $"Imported {importedCount} file(s)" : "No supported files imported";
+    }
+
+    private void AddImportedAssetToScene(string assetPath)
+    {
+        var displayName = Path.GetFileNameWithoutExtension(assetPath);
+        AddSceneObject(displayName, SceneObjectType.ImportedModel, _sceneObjects.Count * 0.35, 0, 1.5, 1, 1, 1);
+        _sceneObjects.Last().SourceAsset = Path.GetRelativePath(CurrentProjectPath(), assetPath);
+        HierarchyList.SelectedIndex = _sceneObjects.Count - 1;
+    }
+
+    private string CategoryPathFor(string category)
+    {
+        var relativePath = AssetCategory.All.FirstOrDefault(item => item.Name == category)?.RelativePath ?? "assets/imports";
+        return Path.Combine(CurrentProjectPath(), relativePath);
+    }
+
+    private static string CategoryNameForExtension(string extension)
+    {
+        return extension switch
+        {
+            ".glb" or ".gltf" or ".fbx" or ".obj" => "Models",
+            ".png" or ".jpg" or ".jpeg" or ".tga" or ".bmp" => "Textures",
+            ".tomkshader" => "Shaders",
+            ".tomkmat" => "Materials",
+            ".tomk" => "Scripts",
+            ".tomkobj" => "Objects",
+            ".wav" or ".mp3" or ".ogg" => "Audio",
+            ".scene" or ".tomkscene" => "Scenes",
+            _ => "Imports"
+        };
+    }
+
+    private static bool IsModelExtension(string extension)
+    {
+        return extension is ".glb" or ".gltf" or ".fbx" or ".obj";
+    }
+
+    private static string UniqueDestinationPath(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return path;
+        }
+
+        var directory = Path.GetDirectoryName(path)!;
+        var name = Path.GetFileNameWithoutExtension(path);
+        var extension = Path.GetExtension(path);
+
+        for (var index = 1; index < 9999; index++)
+        {
+            var candidate = Path.Combine(directory, $"{name}_{index}{extension}");
+            if (!File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return path;
     }
 
     private void FrameSelectedMenuItem_Click(object sender, RoutedEventArgs e)
@@ -1250,37 +1549,7 @@ class PlayerController : Component {
             return;
         }
 
-        CreateProjectStructure(ProjectNameBox.Text);
-        var files = (string[])e.Data.GetData(DataFormats.FileDrop);
-        var accepted = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".glb", ".gltf", ".fbx", ".obj", ".tomkobj" };
-        var importedCount = 0;
-
-        foreach (var file in files.Where(File.Exists))
-        {
-            var extension = Path.GetExtension(file);
-            if (!accepted.Contains(extension))
-            {
-                Log($"Skipped unsupported drop: {Path.GetFileName(file)}");
-                continue;
-            }
-
-            var destination = Path.Combine(CurrentProjectPath(), "assets", "models", Path.GetFileName(file));
-            File.Copy(file, destination, true);
-
-            var displayName = Path.GetFileNameWithoutExtension(file);
-            AddSceneObject(displayName, SceneObjectType.ImportedModel, importedCount * 1.25, 0, 1.5, 1, 1, 1);
-            _sceneObjects.Last().SourceAsset = Path.GetRelativePath(CurrentProjectPath(), destination);
-            importedCount++;
-            Log($"Imported model into Scene View: {displayName}");
-        }
-
-        if (importedCount > 0)
-        {
-            HierarchyList.SelectedIndex = _sceneObjects.Count - 1;
-            RefreshProjectFiles();
-            RebuildViewports();
-            StatusText.Text = $"Imported {importedCount} model(s)";
-        }
+        ImportFilesToProject((string[])e.Data.GetData(DataFormats.FileDrop), addModelsToScene: true);
     }
 
     private void Window_KeyDown(object sender, KeyEventArgs e)
@@ -1492,6 +1761,24 @@ public sealed class SkySettings
     public Color SkyColor { get; set; } = Color.FromRgb(79, 134, 198);
     public Color HorizonColor { get; set; } = Color.FromRgb(215, 237, 245);
     public double CloudDensity { get; set; } = 0.45;
+}
+
+public sealed record AssetBrowserNode(string Name, string FullPath, string RelativePath, bool IsDirectory, string Category);
+
+public sealed record AssetCategory(string Name, string RelativePath, string Icon)
+{
+    public static IReadOnlyList<AssetCategory> All { get; } =
+    [
+        new("Models", Path.Combine("assets", "models"), "[Models]"),
+        new("Materials", Path.Combine("assets", "materials"), "[Materials]"),
+        new("Shaders", Path.Combine("assets", "shaders"), "[Shaders]"),
+        new("Textures", Path.Combine("assets", "textures"), "[Textures]"),
+        new("Scripts", "scripts", "[Scripts]"),
+        new("Scenes", "scenes", "[Scenes]"),
+        new("Objects", "objects", "[Objects]"),
+        new("Audio", Path.Combine("assets", "audio"), "[Audio]"),
+        new("Imports", Path.Combine("assets", "imports"), "[Imports]")
+    ];
 }
 
 public static class SceneSerializer

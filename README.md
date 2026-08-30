@@ -66,6 +66,9 @@ It includes:
 - File menu with Create New Project, New Object, New Script, Save Scene.
 - File menu can create shader and material assets.
 - Project folders are created under `projects/<ProjectName>/` with `assets`, `objects`, `scenes`, and `scripts`.
+- Asset Browser works like a project file explorer with category folders, search, preview, drag-drop, and right-click actions.
+- Asset categories include Models, Materials, Shaders, Textures, Scripts, Scenes, Objects, Audio, and Imports.
+- Right-click assets to add supported models/objects to the scene, import model/texture files, create shaders/materials/scripts/object files, reveal in Explorer, or refresh.
 - Project shader files are saved under `projects/<ProjectName>/assets/shaders`.
 - Project material files are saved under `projects/<ProjectName>/assets/materials`.
 - Materials can choose a shader and can be assigned to selected objects.

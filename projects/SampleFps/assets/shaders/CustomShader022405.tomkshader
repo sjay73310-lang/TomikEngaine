@@ -1,0 +1,4 @@
+shader "CustomShader022405" {
+    kind: Lit;
+    surface: "BaseColor * directLight + ambientSky";
+}

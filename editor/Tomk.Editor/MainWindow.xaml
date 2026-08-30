@@ -248,19 +248,89 @@
         <TabControl>
           <TabItem Header="Assets">
             <Grid Margin="10">
+              <Grid.RowDefinitions>
+                <RowDefinition Height="34"/>
+                <RowDefinition Height="*"/>
+              </Grid.RowDefinitions>
               <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="190"/>
+                <ColumnDefinition Width="260"/>
                 <ColumnDefinition Width="*"/>
               </Grid.ColumnDefinitions>
-              <ListBox x:Name="ProjectFilesList"/>
-              <WrapPanel Grid.Column="1" Margin="10,0,0,0">
-                <Button Content="+ Object" Click="NewObjectMenuItem_Click"/>
-                <Button Content="+ Script" Click="NewScriptMenuItem_Click"/>
-                <Button Content="+ Shader" Click="NewShaderMenuItem_Click"/>
-                <Button Content="+ Material" Click="NewMaterialMenuItem_Click"/>
-                <Button Content="Save Scene" Click="SaveSceneButton_Click"/>
-                <Button Content="Refresh Files" Click="RefreshProjectFilesButton_Click"/>
-              </WrapPanel>
+
+              <DockPanel Grid.ColumnSpan="2" LastChildFill="True">
+                <TextBox x:Name="AssetSearchBox"
+                         Width="240"
+                         DockPanel.Dock="Left"
+                         TextChanged="AssetSearchBox_TextChanged"
+                         ToolTip="Search project assets"
+                         Text=""/>
+                <ComboBox x:Name="AssetCategoryBox"
+                          Width="150"
+                          DockPanel.Dock="Left"
+                          Margin="8,3,8,8"
+                          SelectionChanged="AssetCategoryBox_SelectionChanged">
+                  <ComboBoxItem Content="All"/>
+                  <ComboBoxItem Content="Models"/>
+                  <ComboBoxItem Content="Materials"/>
+                  <ComboBoxItem Content="Shaders"/>
+                  <ComboBoxItem Content="Textures"/>
+                  <ComboBoxItem Content="Scripts"/>
+                  <ComboBoxItem Content="Scenes"/>
+                  <ComboBoxItem Content="Objects"/>
+                  <ComboBoxItem Content="Audio"/>
+                  <ComboBoxItem Content="Imports"/>
+                </ComboBox>
+                <TextBlock x:Name="AssetPathText" Text="Project Assets" Foreground="#aeb6c2" VerticalAlignment="Center"/>
+              </DockPanel>
+
+              <TreeView x:Name="AssetTree"
+                        Grid.Row="1"
+                        Grid.Column="0"
+                        SelectedItemChanged="AssetTree_SelectedItemChanged"
+                        AllowDrop="True"
+                        DragOver="AssetTree_DragOver"
+                        Drop="AssetTree_Drop"
+                        Background="#15181d"
+                        Foreground="{StaticResource TextBrush}"
+                        BorderBrush="#3c424d">
+                <TreeView.ContextMenu>
+                  <ContextMenu>
+                    <MenuItem Header="Add To Scene" Click="AddSelectedAssetToSceneMenuItem_Click"/>
+                    <Separator/>
+                    <MenuItem Header="Import Model" Click="ImportModelMenuItem_Click"/>
+                    <MenuItem Header="Import Texture" Click="ImportTextureMenuItem_Click"/>
+                    <MenuItem Header="New Shader" Click="NewShaderMenuItem_Click"/>
+                    <MenuItem Header="New Material" Click="NewMaterialMenuItem_Click"/>
+                    <MenuItem Header="New Object File" Click="NewObjectMenuItem_Click"/>
+                    <MenuItem Header="New Script" Click="NewScriptMenuItem_Click"/>
+                    <MenuItem Header="New Folder" Click="CreateAssetFolderMenuItem_Click"/>
+                    <Separator/>
+                    <MenuItem Header="Reveal In Explorer" Click="RevealAssetMenuItem_Click"/>
+                    <MenuItem Header="Refresh" Click="RefreshProjectFilesButton_Click"/>
+                  </ContextMenu>
+                </TreeView.ContextMenu>
+              </TreeView>
+
+              <DockPanel Grid.Row="1" Grid.Column="1" Margin="10,0,0,0">
+                <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                  <Button Content="Import Model" Click="ImportModelMenuItem_Click"/>
+                  <Button Content="Import Texture" Click="ImportTextureMenuItem_Click"/>
+                  <Button Content="+ Shader" Click="NewShaderMenuItem_Click"/>
+                  <Button Content="+ Material" Click="NewMaterialMenuItem_Click"/>
+                  <Button Content="+ Script" Click="NewScriptMenuItem_Click"/>
+                  <Button Content="Save Scene" Click="SaveSceneButton_Click"/>
+                  <Button Content="Refresh" Click="RefreshProjectFilesButton_Click"/>
+                </WrapPanel>
+
+                <Border Background="#101216" BorderBrush="#3c424d" BorderThickness="1" Padding="10">
+                  <StackPanel>
+                    <TextBlock x:Name="AssetPreviewTitle" Text="Asset Inspector" FontWeight="SemiBold" Foreground="#eef2f7"/>
+                    <TextBlock x:Name="AssetPreviewKind" Text="Select any project file" Foreground="#aeb6c2" Margin="0,4,0,0"/>
+                    <TextBlock x:Name="AssetPreviewPath" Text="" Foreground="#7f8b9a" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                    <TextBlock Text="Right-click assets to import, create, reveal, or add supported files to the scene." Foreground="#aeb6c2" TextWrapping="Wrap" Margin="0,10,0,0"/>
+                  </StackPanel>
+                </Border>
+              </DockPanel>
             </Grid>
           </TabItem>
           <TabItem Header="Console">

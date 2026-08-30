@@ -1,0 +1,51 @@
+scene "Editor Scene" {
+    entity "Ground" {
+        type: Plane;
+        position: Vector3(0, -0.55, 0);
+        rotation: Vector3(0, 0, 0);
+        scale: Vector3(12, 1, 12);
+        material: "GroundMaterial";
+    }
+
+    entity "Player Cube" {
+        type: Cube;
+        position: Vector3(0, 0, 0);
+        rotation: Vector3(0, 251.4, 0);
+        scale: Vector3(1, 1, 1);
+        material: "DefaultMaterial";
+    }
+
+    entity "Target Sphere" {
+        type: Sphere;
+        position: Vector3(2.2, 0.15, 0.8);
+        rotation: Vector3(0, 251.4, 0);
+        scale: Vector3(0.8, 0.8, 0.8);
+        material: "BluePreview";
+    }
+
+    entity "Main Camera" {
+        type: Camera;
+        position: Vector3(0, 2.2, -6.5);
+        rotation: Vector3(0, 251.4, 0);
+        scale: Vector3(0.5, 0.35, 0.35);
+        material: "BluePreview";
+    }
+
+    entity "Sun Light" {
+        type: DirectionalLight;
+        position: Vector3(-2.4, 4, -2.2);
+        rotation: Vector3(0, 251.4, 0);
+        scale: Vector3(0.4, 0.4, 0.4);
+        material: "UnlitColor";
+        intensity: 1;
+    }
+
+    entity "Game Settings" {
+        type: GameSettings;
+        position: Vector3(0, 1.2, 2.8);
+        rotation: Vector3(0, 251.4, 0);
+        scale: Vector3(0.55, 0.55, 0.55);
+        material: "DefaultMaterial";
+    }
+
+}
