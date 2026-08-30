@@ -64,7 +64,16 @@ It includes:
 - Add cube, sphere, and plane buttons.
 - Duplicate/delete selected object.
 - File menu with Create New Project, New Object, New Script, Save Scene.
+- File menu can create shader and material assets.
 - Project folders are created under `projects/<ProjectName>/` with `assets`, `objects`, `scenes`, and `scripts`.
+- Project shader files are saved under `projects/<ProjectName>/assets/shaders`.
+- Project material files are saved under `projects/<ProjectName>/assets/materials`.
+- Materials can choose a shader and can be assigned to selected objects.
+- Default shaders include `DefaultLit`, `UnlitColor`, and `VolumetricSkyCloud`.
+- Hierarchy includes camera, directional light, point light, and game settings objects.
+- Scene lighting uses hierarchy light objects.
+- Sky supports `Classic Skybox` and `Volumetric Sky` modes.
+- Scene View supports drag-and-drop import for `.glb`, `.gltf`, `.fbx`, `.obj`, and `.tomkobj` files.
 - Asset, console, and Tomk Script panels.
 - Save Scene action that writes `projects/<ProjectName>/scenes/editor.scene.tomk`.
 

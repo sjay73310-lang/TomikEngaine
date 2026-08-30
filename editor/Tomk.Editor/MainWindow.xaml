@@ -19,6 +19,8 @@
         <Separator/>
         <MenuItem Header="New Object" Click="NewObjectMenuItem_Click"/>
         <MenuItem Header="New Script" Click="NewScriptMenuItem_Click"/>
+        <MenuItem Header="New Shader" Click="NewShaderMenuItem_Click"/>
+        <MenuItem Header="New Material" Click="NewMaterialMenuItem_Click"/>
         <Separator/>
         <MenuItem Header="Save Scene" Click="SaveSceneButton_Click"/>
       </MenuItem>
@@ -29,6 +31,12 @@
       <MenuItem Header="_View">
         <MenuItem Header="Frame Selected" Click="FrameSelectedMenuItem_Click"/>
         <MenuItem Header="Reset Camera" Click="ResetCameraMenuItem_Click"/>
+      </MenuItem>
+      <MenuItem Header="_GameObject">
+        <MenuItem Header="Camera" Click="AddCameraMenuItem_Click"/>
+        <MenuItem Header="Directional Light" Click="AddDirectionalLightMenuItem_Click"/>
+        <MenuItem Header="Point Light" Click="AddPointLightMenuItem_Click"/>
+        <MenuItem Header="Game Settings" Click="AddGameSettingsMenuItem_Click"/>
       </MenuItem>
     </Menu>
 
@@ -82,6 +90,7 @@
             <Button Content="+ Cube" Click="AddCubeButton_Click"/>
             <Button Content="+ Sphere" Click="AddSphereButton_Click"/>
             <Button Content="+ Plane" Click="AddPlaneButton_Click"/>
+            <Button Content="+ Light" Click="AddPointLightMenuItem_Click"/>
           </StackPanel>
           <ListBox x:Name="HierarchyList"
                    DisplayMemberPath="Name"
@@ -94,11 +103,14 @@
           <TabItem Header="Scene View">
             <Grid x:Name="SceneViewSurface"
                   Background="#111318"
+                  AllowDrop="True"
                   Focusable="True"
                   MouseDown="SceneViewSurface_MouseDown"
                   MouseMove="SceneViewSurface_MouseMove"
                   MouseUp="SceneViewSurface_MouseUp"
-                  MouseWheel="SceneViewSurface_MouseWheel">
+                  MouseWheel="SceneViewSurface_MouseWheel"
+                  DragOver="SceneViewSurface_DragOver"
+                  Drop="SceneViewSurface_Drop">
               <Viewport3D x:Name="SceneViewport"/>
               <Border Background="#aa15171b" BorderBrush="#3c424d" BorderThickness="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12" Padding="10,6">
                 <StackPanel>
@@ -109,7 +121,7 @@
             </Grid>
           </TabItem>
           <TabItem Header="Game View">
-            <Grid Background="#050609">
+            <Grid x:Name="GameViewSurface" Background="#050609">
               <Viewport3D x:Name="GameViewport"/>
               <Border Background="#aa15171b" BorderBrush="#3c424d" BorderThickness="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12" Padding="10,6">
                 <TextBlock x:Name="GameOverlayText" Text="Press Play to preview the scene" Foreground="#dce4ee"/>
@@ -195,6 +207,33 @@
               <Button Content="Delete" Click="DeleteButton_Click"/>
             </StackPanel>
 
+            <TextBlock Text="Material" FontWeight="SemiBold" Margin="0,4,0,4"/>
+            <ComboBox x:Name="ObjectMaterialBox" DisplayMemberPath="Name" SelectionChanged="ObjectMaterialBox_SelectionChanged" Margin="0,3,0,8"/>
+            <UniformGrid Columns="2" Margin="0,0,0,8">
+              <Button Content="New Material" Click="NewMaterialMenuItem_Click"/>
+              <Button Content="Assign" Click="AssignMaterialButton_Click"/>
+            </UniformGrid>
+
+            <TextBlock Text="Selected Material Shader" Foreground="{StaticResource MutedTextBrush}"/>
+            <ComboBox x:Name="MaterialShaderBox" DisplayMemberPath="Name" SelectionChanged="MaterialShaderBox_SelectionChanged" Margin="0,3,0,8"/>
+            <UniformGrid Columns="2" Margin="0,0,0,12">
+              <Button Content="New Shader" Click="NewShaderMenuItem_Click"/>
+              <Button Content="Save Material" Click="SaveMaterialButton_Click"/>
+            </UniformGrid>
+
+            <TextBlock Text="Sky" FontWeight="SemiBold" Margin="0,6,0,4"/>
+            <ComboBox x:Name="SkyModeBox" SelectionChanged="SkyModeBox_SelectionChanged" Margin="0,3,0,8">
+              <ComboBoxItem Content="Classic Skybox"/>
+              <ComboBoxItem Content="Volumetric Sky"/>
+            </ComboBox>
+            <TextBlock Text="Sky Color" Foreground="{StaticResource MutedTextBrush}"/>
+            <TextBox x:Name="SkyColorBox" Text="#4f86c6"/>
+            <TextBlock Text="Horizon Color" Foreground="{StaticResource MutedTextBrush}"/>
+            <TextBox x:Name="HorizonColorBox" Text="#d7edf5"/>
+            <TextBlock Text="Cloud Density" Foreground="{StaticResource MutedTextBrush}"/>
+            <TextBox x:Name="CloudDensityBox" Text="0.45"/>
+            <Button Content="Apply Sky" Click="ApplySkyButton_Click" Margin="0,0,0,12"/>
+
             <TextBlock Text="Component Notes" FontWeight="SemiBold" Margin="0,8,0,4"/>
             <TextBox x:Name="ComponentNotesBox"
                      Height="120"
@@ -217,6 +256,8 @@
               <WrapPanel Grid.Column="1" Margin="10,0,0,0">
                 <Button Content="+ Object" Click="NewObjectMenuItem_Click"/>
                 <Button Content="+ Script" Click="NewScriptMenuItem_Click"/>
+                <Button Content="+ Shader" Click="NewShaderMenuItem_Click"/>
+                <Button Content="+ Material" Click="NewMaterialMenuItem_Click"/>
                 <Button Content="Save Scene" Click="SaveSceneButton_Click"/>
                 <Button Content="Refresh Files" Click="RefreshProjectFilesButton_Click"/>
               </WrapPanel>

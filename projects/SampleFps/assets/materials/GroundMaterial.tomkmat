@@ -1,0 +1,4 @@
+material "GroundMaterial" {
+    shader: "DefaultLit";
+    color: "#FF434C46";
+}

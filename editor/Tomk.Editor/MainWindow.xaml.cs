@@ -13,9 +13,12 @@ namespace Tomk.Editor;
 public partial class MainWindow : Window
 {
     private readonly ObservableCollection<SceneObject> _sceneObjects = new();
+    private readonly ObservableCollection<ShaderAsset> _shaders = new();
+    private readonly ObservableCollection<MaterialAsset> _materials = new();
     private readonly Dictionary<Model3D, SceneObject> _modelToObject = new();
     private readonly Dictionary<Model3D, GizmoHit> _gizmoHits = new();
     private readonly DispatcherTimer _playTimer = new();
+    private readonly SkySettings _sky = new();
     private Point3D _sceneTarget = new(0, 0.8, 0);
     private Point _lastMouse;
     private Point _mouseDownPoint;
@@ -37,6 +40,8 @@ public partial class MainWindow : Window
         InitializeComponent();
 
         HierarchyList.ItemsSource = _sceneObjects;
+        ObjectMaterialBox.ItemsSource = _materials;
+        MaterialShaderBox.ItemsSource = _shaders;
         ScriptBox.Text = """
 class PlayerController : Component {
     walkSpeed: float = 5.0;
@@ -52,9 +57,13 @@ class PlayerController : Component {
         _playTimer.Interval = TimeSpan.FromMilliseconds(16);
         _playTimer.Tick += PlayTimer_Tick;
 
+        AddDefaultRenderAssets();
         AddSceneObject("Ground", SceneObjectType.Plane, 0, -0.55, 0, 12, 1, 12);
         AddSceneObject("Player Cube", SceneObjectType.Cube, 0, 0, 0, 1, 1, 1);
         AddSceneObject("Target Sphere", SceneObjectType.Sphere, 2.2, 0.15, 0.8, 0.8, 0.8, 0.8);
+        AddSceneObject("Main Camera", SceneObjectType.Camera, 0, 2.2, -6.5, 0.5, 0.35, 0.35);
+        AddSceneObject("Sun Light", SceneObjectType.DirectionalLight, -2.4, 4.0, -2.2, 0.4, 0.4, 0.4);
+        AddSceneObject("Game Settings", SceneObjectType.GameSettings, 0, 1.2, 2.8, 0.55, 0.55, 0.55);
 
         HierarchyList.SelectedIndex = 1;
         SetActiveTool(TransformTool.Select);
@@ -63,11 +72,35 @@ class PlayerController : Component {
         CreateProjectStructure(_currentProjectName);
         RefreshProjectFiles();
         Log("Tomk Engine Editor started.");
-        Log("Scene supports click selection, XYZ transform gizmo, inspector editing, and Game View.");
+        Log("Scene supports click selection, camera/light/game settings, material/shader links, sky controls, and drag-drop imports.");
+    }
+
+    private void AddDefaultRenderAssets()
+    {
+        _shaders.Add(new ShaderAsset("DefaultLit", ShaderKind.Lit, "BaseColor * light + sky ambient"));
+        _shaders.Add(new ShaderAsset("UnlitColor", ShaderKind.Unlit, "BaseColor without scene lighting"));
+        _shaders.Add(new ShaderAsset("VolumetricSkyCloud", ShaderKind.VolumetricSky, "Sky color + horizon + density cloud layers"));
+
+        _materials.Add(new MaterialAsset("DefaultMaterial", "DefaultLit", Color.FromRgb(212, 178, 86)));
+        _materials.Add(new MaterialAsset("GroundMaterial", "DefaultLit", Color.FromRgb(67, 76, 70)));
+        _materials.Add(new MaterialAsset("BluePreview", "UnlitColor", Color.FromRgb(87, 157, 214)));
+
+        ObjectMaterialBox.SelectedIndex = 0;
+        MaterialShaderBox.SelectedIndex = 0;
+        SkyModeBox.SelectedIndex = 0;
     }
 
     private void AddSceneObject(string name, SceneObjectType type, double x, double y, double z, double sx, double sy, double sz)
     {
+        var materialName = type switch
+        {
+            SceneObjectType.Plane => "GroundMaterial",
+            SceneObjectType.Sphere => "BluePreview",
+            SceneObjectType.Camera => "BluePreview",
+            SceneObjectType.PointLight or SceneObjectType.DirectionalLight => "UnlitColor",
+            _ => "DefaultMaterial"
+        };
+
         _sceneObjects.Add(new SceneObject
         {
             Name = name,
@@ -77,7 +110,8 @@ class PlayerController : Component {
             Z = z,
             ScaleX = sx,
             ScaleY = sy,
-            ScaleZ = sz
+            ScaleZ = sz,
+            MaterialName = materialName
         });
     }
 
@@ -88,16 +122,11 @@ class PlayerController : Component {
         _modelToObject.Clear();
         _gizmoHits.Clear();
 
-        GameViewport.Camera = new PerspectiveCamera
-        {
-            Position = new Point3D(0, 2.2, -6.5),
-            LookDirection = new Vector3D(0, -0.2, 1),
-            UpDirection = new Vector3D(0, 1, 0),
-            FieldOfView = 62
-        };
+        GameViewport.Camera = BuildGameCamera();
 
         AddLights(SceneViewport);
         AddLights(GameViewport);
+        ApplySkyToSurfaces();
 
         foreach (var sceneObject in _sceneObjects)
         {
@@ -113,29 +142,83 @@ class PlayerController : Component {
         }
     }
 
-    private static void AddLights(Viewport3D viewport)
+    private PerspectiveCamera BuildGameCamera()
+    {
+        var cameraObject = _sceneObjects.FirstOrDefault(item => item.Type == SceneObjectType.Camera);
+        if (cameraObject is null)
+        {
+            return new PerspectiveCamera
+            {
+                Position = new Point3D(0, 2.2, -6.5),
+                LookDirection = new Vector3D(0, -0.2, 1),
+                UpDirection = new Vector3D(0, 1, 0),
+                FieldOfView = 62
+            };
+        }
+
+        return new PerspectiveCamera
+        {
+            Position = new Point3D(cameraObject.X, cameraObject.Y, cameraObject.Z),
+            LookDirection = new Vector3D(0, -0.15, 1),
+            UpDirection = new Vector3D(0, 1, 0),
+            FieldOfView = 62
+        };
+    }
+
+    private void AddLights(Viewport3D viewport)
     {
         var lights = new Model3DGroup();
-        lights.Children.Add(new AmbientLight(Color.FromRgb(80, 86, 96)));
-        lights.Children.Add(new DirectionalLight(Color.FromRgb(235, 241, 255), new Vector3D(-0.35, -0.8, -0.45)));
+        var ambient = _sky.Mode == SkyMode.Volumetric ? (byte)105 : (byte)80;
+        lights.Children.Add(new AmbientLight(Color.FromRgb(ambient, ambient, (byte)Math.Min(255, ambient + 12))));
+
+        var lightObjects = _sceneObjects.Where(item => item.Type is SceneObjectType.DirectionalLight or SceneObjectType.PointLight).ToList();
+        if (lightObjects.Count == 0)
+        {
+            lights.Children.Add(new DirectionalLight(Color.FromRgb(235, 241, 255), new Vector3D(-0.35, -0.8, -0.45)));
+        }
+
+        foreach (var light in lightObjects)
+        {
+            var lightColor = ScaleColor(light.LightColor, light.LightIntensity);
+            if (light.Type == SceneObjectType.PointLight)
+            {
+                lights.Children.Add(new PointLight(lightColor, new Point3D(light.X, light.Y, light.Z)));
+            }
+            else
+            {
+                var direction = new Vector3D(light.X == 0 ? -0.35 : -light.X, light.Y == 0 ? -0.8 : -light.Y, light.Z == 0 ? -0.45 : -light.Z);
+                direction.Normalize();
+                lights.Children.Add(new DirectionalLight(lightColor, direction));
+            }
+        }
+
         viewport.Children.Add(new ModelVisual3D { Content = lights });
     }
 
-    private static GeometryModel3D BuildModel(SceneObject sceneObject, bool selected)
+    private static Color ScaleColor(Color color, double intensity)
+    {
+        return Color.FromRgb(
+            (byte)Math.Clamp(color.R * intensity, 0, 255),
+            (byte)Math.Clamp(color.G * intensity, 0, 255),
+            (byte)Math.Clamp(color.B * intensity, 0, 255));
+    }
+
+    private GeometryModel3D BuildModel(SceneObject sceneObject, bool selected)
     {
         var mesh = sceneObject.Type switch
         {
             SceneObjectType.Sphere => MeshFactory.CreateSphere(0.55, 24, 16),
             SceneObjectType.Plane => MeshFactory.CreatePlane(1),
+            SceneObjectType.Camera => MeshFactory.CreateCameraMarker(),
+            SceneObjectType.PointLight => MeshFactory.CreateSphere(0.28, 16, 10),
+            SceneObjectType.DirectionalLight => MeshFactory.CreateCube(0.55),
+            SceneObjectType.GameSettings => MeshFactory.CreateCube(0.45),
             _ => MeshFactory.CreateCube(1)
         };
 
-        var color = sceneObject.Type switch
-        {
-            SceneObjectType.Plane => Color.FromRgb(67, 76, 70),
-            SceneObjectType.Sphere => Color.FromRgb(87, 157, 214),
-            _ => Color.FromRgb(212, 178, 86)
-        };
+        var materialAsset = FindMaterial(sceneObject.MaterialName);
+        var shader = FindShader(materialAsset.ShaderName);
+        var color = shader.Kind == ShaderKind.Unlit ? materialAsset.BaseColor : BlendWithSky(materialAsset.BaseColor);
 
         if (selected)
         {
@@ -144,7 +227,10 @@ class PlayerController : Component {
 
         var material = new MaterialGroup();
         material.Children.Add(new DiffuseMaterial(new SolidColorBrush(color)));
-        material.Children.Add(new SpecularMaterial(new SolidColorBrush(Color.FromRgb(220, 230, 240)), 22));
+        if (shader.Kind == ShaderKind.Lit)
+        {
+            material.Children.Add(new SpecularMaterial(new SolidColorBrush(Color.FromRgb(220, 230, 240)), 22));
+        }
 
         var transform = new Transform3DGroup();
         transform.Children.Add(new ScaleTransform3D(sceneObject.ScaleX, sceneObject.ScaleY, sceneObject.ScaleZ));
@@ -158,6 +244,50 @@ class PlayerController : Component {
             BackMaterial = material,
             Transform = transform
         };
+    }
+
+    private MaterialAsset FindMaterial(string materialName)
+    {
+        return _materials.FirstOrDefault(item => item.Name == materialName) ?? _materials.First();
+    }
+
+    private ShaderAsset FindShader(string shaderName)
+    {
+        return _shaders.FirstOrDefault(item => item.Name == shaderName) ?? _shaders.First();
+    }
+
+    private Color BlendWithSky(Color color)
+    {
+        if (_sky.Mode == SkyMode.Classic)
+        {
+            return color;
+        }
+
+        var density = Math.Clamp(_sky.CloudDensity, 0, 1);
+        return Color.FromRgb(
+            (byte)(color.R * (1 - density * 0.25) + _sky.HorizonColor.R * density * 0.25),
+            (byte)(color.G * (1 - density * 0.25) + _sky.HorizonColor.G * density * 0.25),
+            (byte)(color.B * (1 - density * 0.25) + _sky.HorizonColor.B * density * 0.25));
+    }
+
+    private void ApplySkyToSurfaces()
+    {
+        if (_sky.Mode == SkyMode.Volumetric)
+        {
+            var sky = new LinearGradientBrush();
+            sky.StartPoint = new Point(0, 0);
+            sky.EndPoint = new Point(0, 1);
+            sky.GradientStops.Add(new GradientStop(_sky.SkyColor, 0));
+            sky.GradientStops.Add(new GradientStop(_sky.HorizonColor, 0.72));
+            sky.GradientStops.Add(new GradientStop(Color.FromRgb(42, 48, 56), 1));
+            SceneViewSurface.Background = sky;
+            GameViewSurface.Background = sky.Clone();
+        }
+        else
+        {
+            SceneViewSurface.Background = new SolidColorBrush(_sky.SkyColor);
+            GameViewSurface.Background = new SolidColorBrush(Color.FromRgb(5, 6, 9));
+        }
     }
 
     private Model3DGroup BuildGizmo(SceneObject sceneObject, TransformTool tool)
@@ -286,9 +416,25 @@ class PlayerController : Component {
             ScaleXBox.Text = Format(sceneObject.ScaleX);
             ScaleYBox.Text = Format(sceneObject.ScaleY);
             ScaleZBox.Text = Format(sceneObject.ScaleZ);
+            ObjectMaterialBox.SelectedItem = FindMaterial(sceneObject.MaterialName);
+            MaterialShaderBox.SelectedItem = FindShader(FindMaterial(sceneObject.MaterialName).ShaderName);
+            ComponentNotesBox.Text = ComponentSummary(sceneObject);
         }
 
         _isUpdatingInspector = false;
+    }
+
+    private static string ComponentSummary(SceneObject sceneObject)
+    {
+        return sceneObject.Type switch
+        {
+            SceneObjectType.Camera => "Camera, Transform, Game View Source",
+            SceneObjectType.DirectionalLight => "Directional Light, Transform, Intensity",
+            SceneObjectType.PointLight => "Point Light, Transform, Intensity",
+            SceneObjectType.GameSettings => "Game Settings, Skybox, Volumetric Sky, Render Pipeline",
+            SceneObjectType.ImportedModel => "Imported Model, Transform, Mesh Renderer, Material",
+            _ => "Transform, Mesh Renderer, Collider, Script Component"
+        };
     }
 
     private void ApplyInspector()
@@ -308,6 +454,10 @@ class PlayerController : Component {
         selected.ScaleX = Math.Max(0.05, ReadDouble(ScaleXBox, selected.ScaleX));
         selected.ScaleY = Math.Max(0.05, ReadDouble(ScaleYBox, selected.ScaleY));
         selected.ScaleZ = Math.Max(0.05, ReadDouble(ScaleZBox, selected.ScaleZ));
+        if (ObjectMaterialBox.SelectedItem is MaterialAsset materialAsset)
+        {
+            selected.MaterialName = materialAsset.Name;
+        }
 
         HierarchyList.Items.Refresh();
         RebuildViewports();
@@ -544,6 +694,7 @@ class PlayerController : Component {
         var projectPath = CurrentProjectPath();
         Directory.CreateDirectory(Path.Combine(projectPath, "assets", "models"));
         Directory.CreateDirectory(Path.Combine(projectPath, "assets", "materials"));
+        Directory.CreateDirectory(Path.Combine(projectPath, "assets", "shaders"));
         Directory.CreateDirectory(Path.Combine(projectPath, "assets", "textures"));
         Directory.CreateDirectory(Path.Combine(projectPath, "objects"));
         Directory.CreateDirectory(Path.Combine(projectPath, "scenes"));
@@ -559,6 +710,16 @@ class PlayerController : Component {
         if (!File.Exists(sceneFile))
         {
             File.WriteAllText(sceneFile, SceneSerializer.Serialize(_sceneObjects));
+        }
+
+        foreach (var shader in _shaders)
+        {
+            SaveShaderFile(shader);
+        }
+
+        foreach (var material in _materials)
+        {
+            SaveMaterialFile(material);
         }
     }
 
@@ -735,6 +896,44 @@ class PlayerController : Component {
         Log($"Created script: {scriptPath}");
     }
 
+    private void NewShaderMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        CreateProjectStructure(ProjectNameBox.Text);
+        var shaderName = $"CustomShader{DateTime.Now:HHmmss}";
+        var shader = new ShaderAsset(shaderName, ShaderKind.Lit, "BaseColor * directLight + ambientSky");
+        _shaders.Add(shader);
+        MaterialShaderBox.SelectedItem = shader;
+        SaveShaderFile(shader);
+        RefreshProjectFiles();
+        Log($"Created shader: {shaderName}");
+    }
+
+    private void NewMaterialMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        CreateProjectStructure(ProjectNameBox.Text);
+        var shaderName = MaterialShaderBox.SelectedItem is ShaderAsset shader ? shader.Name : "DefaultLit";
+        var material = new MaterialAsset($"Material{DateTime.Now:HHmmss}", shaderName, Color.FromRgb(196, 204, 214));
+        _materials.Add(material);
+        ObjectMaterialBox.SelectedItem = material;
+        SaveMaterialFile(material);
+        RefreshProjectFiles();
+        Log($"Created material: {material.Name} using shader {material.ShaderName}");
+    }
+
+    private void SaveShaderFile(ShaderAsset shader)
+    {
+        var shaderPath = Path.Combine(CurrentProjectPath(), "assets", "shaders", $"{shader.Name}.tomkshader");
+        Directory.CreateDirectory(Path.GetDirectoryName(shaderPath)!);
+        File.WriteAllText(shaderPath, $"shader \"{shader.Name}\" {{\n    kind: {shader.Kind};\n    surface: \"{shader.Source}\";\n}}\n");
+    }
+
+    private void SaveMaterialFile(MaterialAsset material)
+    {
+        var materialPath = Path.Combine(CurrentProjectPath(), "assets", "materials", $"{material.Name}.tomkmat");
+        Directory.CreateDirectory(Path.GetDirectoryName(materialPath)!);
+        File.WriteAllText(materialPath, $"material \"{material.Name}\" {{\n    shader: \"{material.ShaderName}\";\n    color: \"{material.BaseColor}\";\n}}\n");
+    }
+
     private void RefreshProjectFilesButton_Click(object sender, RoutedEventArgs e)
     {
         CreateProjectStructure(ProjectNameBox.Text);
@@ -755,6 +954,38 @@ class PlayerController : Component {
         _cameraDistance = 8;
         UpdateCameras();
         StatusText.Text = "Camera reset";
+    }
+
+    private void AddCameraMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        AddSceneObject("Camera", SceneObjectType.Camera, 0, 2.0, -5.5, 0.5, 0.35, 0.35);
+        HierarchyList.SelectedIndex = _sceneObjects.Count - 1;
+        RebuildViewports();
+        Log("Camera added to hierarchy and Game View can use it.");
+    }
+
+    private void AddDirectionalLightMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        AddSceneObject("Directional Light", SceneObjectType.DirectionalLight, -2.0, 4.0, -2.0, 0.4, 0.4, 0.4);
+        HierarchyList.SelectedIndex = _sceneObjects.Count - 1;
+        RebuildViewports();
+        Log("Directional Light added.");
+    }
+
+    private void AddPointLightMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        AddSceneObject("Point Light", SceneObjectType.PointLight, 1.5, 2.0, -1.5, 0.35, 0.35, 0.35);
+        HierarchyList.SelectedIndex = _sceneObjects.Count - 1;
+        RebuildViewports();
+        Log("Point Light added.");
+    }
+
+    private void AddGameSettingsMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        AddSceneObject("Game Settings", SceneObjectType.GameSettings, 0, 1.2, 2.8, 0.55, 0.55, 0.55);
+        HierarchyList.SelectedIndex = _sceneObjects.Count - 1;
+        RebuildViewports();
+        Log("Game Settings added to hierarchy.");
     }
 
     private void PlayButton_Click(object sender, RoutedEventArgs e)
@@ -791,6 +1022,96 @@ class PlayerController : Component {
         File.WriteAllText(scenePath, SceneSerializer.Serialize(_sceneObjects));
         RefreshProjectFiles();
         return scenePath;
+    }
+
+    private void AssignMaterialButton_Click(object sender, RoutedEventArgs e)
+    {
+        ApplyInspector();
+        if (HierarchyList.SelectedItem is SceneObject selected)
+        {
+            Log($"Assigned material {selected.MaterialName} to {selected.Name}.");
+        }
+    }
+
+    private void ObjectMaterialBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isUpdatingInspector || ObjectMaterialBox.SelectedItem is not MaterialAsset material)
+        {
+            return;
+        }
+
+        if (HierarchyList.SelectedItem is SceneObject selected)
+        {
+            selected.MaterialName = material.Name;
+            MaterialShaderBox.SelectedItem = FindShader(material.ShaderName);
+            RebuildViewports();
+            StatusText.Text = $"Material: {material.Name}";
+        }
+    }
+
+    private void MaterialShaderBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isUpdatingInspector || ObjectMaterialBox.SelectedItem is not MaterialAsset material || MaterialShaderBox.SelectedItem is not ShaderAsset shader)
+        {
+            return;
+        }
+
+        material.ShaderName = shader.Name;
+        SaveMaterialFile(material);
+        RebuildViewports();
+        RefreshProjectFiles();
+        StatusText.Text = $"Shader: {shader.Name}";
+    }
+
+    private void SaveMaterialButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (ObjectMaterialBox.SelectedItem is MaterialAsset material)
+        {
+            SaveMaterialFile(material);
+            RefreshProjectFiles();
+            Log($"Saved material: {material.Name}");
+        }
+    }
+
+    private void SkyModeBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isUpdatingInspector)
+        {
+            return;
+        }
+
+        _sky.Mode = SkyModeBox.SelectedIndex == 1 ? SkyMode.Volumetric : SkyMode.Classic;
+        ApplySkyToSurfaces();
+        RebuildViewports();
+    }
+
+    private void ApplySkyButton_Click(object sender, RoutedEventArgs e)
+    {
+        _sky.Mode = SkyModeBox.SelectedIndex == 1 ? SkyMode.Volumetric : SkyMode.Classic;
+        _sky.SkyColor = ParseColor(SkyColorBox.Text, _sky.SkyColor);
+        _sky.HorizonColor = ParseColor(HorizonColorBox.Text, _sky.HorizonColor);
+        _sky.CloudDensity = Math.Clamp(ReadDouble(CloudDensityBox, _sky.CloudDensity), 0, 1);
+
+        CreateProjectStructure(ProjectNameBox.Text);
+        var skyPath = Path.Combine(CurrentProjectPath(), "assets", "sky.tomksky");
+        File.WriteAllText(skyPath, $"sky \"Main Sky\" {{\n    mode: {_sky.Mode};\n    skyColor: \"{_sky.SkyColor}\";\n    horizonColor: \"{_sky.HorizonColor}\";\n    cloudDensity: {_sky.CloudDensity:0.###};\n}}\n");
+
+        ApplySkyToSurfaces();
+        RebuildViewports();
+        RefreshProjectFiles();
+        Log($"Sky updated: {_sky.Mode}");
+    }
+
+    private static Color ParseColor(string value, Color fallback)
+    {
+        try
+        {
+            return (Color)ColorConverter.ConvertFromString(value);
+        }
+        catch
+        {
+            return fallback;
+        }
     }
 
     private void BuildGameButton_Click(object sender, RoutedEventArgs e)
@@ -914,6 +1235,52 @@ class PlayerController : Component {
         _cameraDistance = Math.Clamp(_cameraDistance - e.Delta * 0.008, 2.5, 30);
         UpdateCameras();
         e.Handled = true;
+    }
+
+    private void SceneViewSurface_DragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void SceneViewSurface_Drop(object sender, DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(DataFormats.FileDrop))
+        {
+            return;
+        }
+
+        CreateProjectStructure(ProjectNameBox.Text);
+        var files = (string[])e.Data.GetData(DataFormats.FileDrop);
+        var accepted = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".glb", ".gltf", ".fbx", ".obj", ".tomkobj" };
+        var importedCount = 0;
+
+        foreach (var file in files.Where(File.Exists))
+        {
+            var extension = Path.GetExtension(file);
+            if (!accepted.Contains(extension))
+            {
+                Log($"Skipped unsupported drop: {Path.GetFileName(file)}");
+                continue;
+            }
+
+            var destination = Path.Combine(CurrentProjectPath(), "assets", "models", Path.GetFileName(file));
+            File.Copy(file, destination, true);
+
+            var displayName = Path.GetFileNameWithoutExtension(file);
+            AddSceneObject(displayName, SceneObjectType.ImportedModel, importedCount * 1.25, 0, 1.5, 1, 1, 1);
+            _sceneObjects.Last().SourceAsset = Path.GetRelativePath(CurrentProjectPath(), destination);
+            importedCount++;
+            Log($"Imported model into Scene View: {displayName}");
+        }
+
+        if (importedCount > 0)
+        {
+            HierarchyList.SelectedIndex = _sceneObjects.Count - 1;
+            RefreshProjectFiles();
+            RebuildViewports();
+            StatusText.Text = $"Imported {importedCount} model(s)";
+        }
     }
 
     private void Window_KeyDown(object sender, KeyEventArgs e)
@@ -1041,7 +1408,12 @@ public enum SceneObjectType
 {
     Cube,
     Sphere,
-    Plane
+    Plane,
+    Camera,
+    DirectionalLight,
+    PointLight,
+    GameSettings,
+    ImportedModel
 }
 
 public sealed class SceneObject
@@ -1057,6 +1429,10 @@ public sealed class SceneObject
     public double ScaleX { get; set; } = 1;
     public double ScaleY { get; set; } = 1;
     public double ScaleZ { get; set; } = 1;
+    public string MaterialName { get; set; } = "DefaultMaterial";
+    public string SourceAsset { get; set; } = "";
+    public double LightIntensity { get; set; } = 1.0;
+    public Color LightColor { get; set; } = Color.FromRgb(235, 241, 255);
 
     public SceneObject Clone(string name)
     {
@@ -1072,9 +1448,50 @@ public sealed class SceneObject
             RotationZ = RotationZ,
             ScaleX = ScaleX,
             ScaleY = ScaleY,
-            ScaleZ = ScaleZ
+            ScaleZ = ScaleZ,
+            MaterialName = MaterialName,
+            SourceAsset = SourceAsset,
+            LightIntensity = LightIntensity,
+            LightColor = LightColor
         };
     }
+}
+
+public enum ShaderKind
+{
+    Lit,
+    Unlit,
+    VolumetricSky
+}
+
+public enum SkyMode
+{
+    Classic,
+    Volumetric
+}
+
+public sealed record ShaderAsset(string Name, ShaderKind Kind, string Source);
+
+public sealed class MaterialAsset
+{
+    public MaterialAsset(string name, string shaderName, Color baseColor)
+    {
+        Name = name;
+        ShaderName = shaderName;
+        BaseColor = baseColor;
+    }
+
+    public string Name { get; }
+    public string ShaderName { get; set; }
+    public Color BaseColor { get; set; }
+}
+
+public sealed class SkySettings
+{
+    public SkyMode Mode { get; set; } = SkyMode.Classic;
+    public Color SkyColor { get; set; } = Color.FromRgb(79, 134, 198);
+    public Color HorizonColor { get; set; } = Color.FromRgb(215, 237, 245);
+    public double CloudDensity { get; set; } = 0.45;
 }
 
 public static class SceneSerializer
@@ -1091,6 +1508,15 @@ public static class SceneSerializer
             writer.WriteLine($"        position: Vector3({sceneObject.X:0.###}, {sceneObject.Y:0.###}, {sceneObject.Z:0.###});");
             writer.WriteLine($"        rotation: Vector3({sceneObject.RotationX:0.###}, {sceneObject.RotationY:0.###}, {sceneObject.RotationZ:0.###});");
             writer.WriteLine($"        scale: Vector3({sceneObject.ScaleX:0.###}, {sceneObject.ScaleY:0.###}, {sceneObject.ScaleZ:0.###});");
+            writer.WriteLine($"        material: \"{sceneObject.MaterialName}\";");
+            if (!string.IsNullOrWhiteSpace(sceneObject.SourceAsset))
+            {
+                writer.WriteLine($"        sourceAsset: \"{sceneObject.SourceAsset}\";");
+            }
+            if (sceneObject.Type is SceneObjectType.PointLight or SceneObjectType.DirectionalLight)
+            {
+                writer.WriteLine($"        intensity: {sceneObject.LightIntensity:0.###};");
+            }
             writer.WriteLine("    }");
             writer.WriteLine();
         }
@@ -1179,6 +1605,30 @@ public static class MeshFactory
             }
         }
 
+        return mesh;
+    }
+
+    public static MeshGeometry3D CreateCameraMarker()
+    {
+        var mesh = CreateCube(1);
+        mesh.Positions.Add(new Point3D(0, 0, 0.55));
+        mesh.Positions.Add(new Point3D(-0.35, -0.2, 1.05));
+        mesh.Positions.Add(new Point3D(0.35, -0.2, 1.05));
+        mesh.Positions.Add(new Point3D(0.35, 0.2, 1.05));
+        mesh.Positions.Add(new Point3D(-0.35, 0.2, 1.05));
+        var start = mesh.Positions.Count - 5;
+        mesh.TriangleIndices.Add(start);
+        mesh.TriangleIndices.Add(start + 1);
+        mesh.TriangleIndices.Add(start + 2);
+        mesh.TriangleIndices.Add(start);
+        mesh.TriangleIndices.Add(start + 2);
+        mesh.TriangleIndices.Add(start + 3);
+        mesh.TriangleIndices.Add(start);
+        mesh.TriangleIndices.Add(start + 3);
+        mesh.TriangleIndices.Add(start + 4);
+        mesh.TriangleIndices.Add(start);
+        mesh.TriangleIndices.Add(start + 4);
+        mesh.TriangleIndices.Add(start + 1);
         return mesh;
     }
 }

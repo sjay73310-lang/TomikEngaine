@@ -1,0 +1,4 @@
+shader "DefaultLit" {
+    kind: Lit;
+    surface: "BaseColor * light + sky ambient";
+}

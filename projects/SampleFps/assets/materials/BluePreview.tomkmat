@@ -1,0 +1,4 @@
+material "BluePreview" {
+    shader: "UnlitColor";
+    color: "#FF579DD6";
+}

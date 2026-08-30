@@ -1,0 +1,4 @@
+shader "VolumetricSkyCloud" {
+    kind: VolumetricSky;
+    surface: "Sky color + horizon + density cloud layers";
+}

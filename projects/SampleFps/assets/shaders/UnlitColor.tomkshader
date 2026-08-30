@@ -1,0 +1,4 @@
+shader "UnlitColor" {
+    kind: Unlit;
+    surface: "BaseColor without scene lighting";
+}

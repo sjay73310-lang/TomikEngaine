@@ -1,0 +1,4 @@
+material "DefaultMaterial" {
+    shader: "DefaultLit";
+    color: "#FFD4B256";
+}
